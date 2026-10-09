@@ -41,7 +41,7 @@ public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libra
         if (cleaned is not null)
         {
             await CleanedSources.RecordSkipAsync(uow, library.Id, row.RelativePath, cleaned, "manual").ConfigureAwait(false);
-            return new RequeueResult(0, 1, cleaned.Reason, AlreadyCleaned: 1);
+            return new RequeueResult(0, 1, $"Weir already cleaned this file, so it skipped it. {cleaned.Reason}.", AlreadyCleaned: 1);
         }
 
         var payload = new WireObject()
@@ -126,7 +126,8 @@ public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libra
 
     /// <summary>
     /// The file's workflow and why it cannot be queued, if it cannot. A queued pass on a missing original only fails
-    /// later with a confusing reason, so a file Weir is done with is refused while its original is gone.
+    /// later with a confusing reason, so a file Weir is done with is refused while its original is gone, as a skip when Weir
+    /// had already cleaned it.
     /// </summary>
     private async Task<(ProcessingLibraryRecord? Library, string? Refusal, CleanedEarlier? Cleaned)> CheckAsync(UnitOfWork uow, ProcessingFileRecord row)
     {
@@ -139,7 +140,8 @@ public sealed class RequeueStore(ProcessingJobStore jobStore, LibraryStore libra
         var originalGone = ProcessingFileStatuses.Concluded.Contains(row.Status) && !OriginalIsInWatchedFolder(library, row.RelativePath);
         if (originalGone)
         {
-            return (library, OriginalGoneDetail, null);
+            var cleanedBefore = await CleanedSources.FindForMissingOriginalAsync(uow, library.Id, row.RelativePath).ConfigureAwait(false);
+            return (library, cleanedBefore is null ? OriginalGoneDetail : null, cleanedBefore);
         }
 
         return (library, null, await CleanedSources.FindAsync(uow, library.Id, library.WatchedFolder, row.RelativePath).ConfigureAwait(false));

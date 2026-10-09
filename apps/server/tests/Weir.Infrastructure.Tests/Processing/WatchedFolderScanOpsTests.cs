@@ -26,6 +26,26 @@ public sealed class WatchedFolderScanOpsTests
     }
 
     [Fact]
+    public void A_folder_that_vanishes_under_the_walk_costs_only_itself()
+    {
+        using var dir = new TempDirectory();
+        var w = dir.Join("w");
+        foreach (var name in new[] { "a", "b", "c" })
+        {
+            Directory.CreateDirectory(Path.Combine(w, name));
+            File.WriteAllBytes(Path.Combine(w, name, name + ".mkv"), [1]);
+        }
+
+        // "b" is deleted after its parent listed it and before it is read.
+        var files = WatchedFolderListing.Walk(
+            w,
+            topLevelOnly: false,
+            folder => folder.Name == "b" ? throw new DirectoryNotFoundException(folder.FullName) : folder.EnumerateFileSystemInfos());
+
+        Assert.Equal(["a.mkv", "c.mkv"], files.Select(file => file.Name).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void A_downloader_hash_artifact_beside_the_real_file_is_skipped()
     {
         using var dir = new TempDirectory();

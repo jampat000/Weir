@@ -31,7 +31,7 @@ export const APP_ICON_SMALL = path.join(BRAND, "weir-app-icon-small.svg");
 export const SMALL_ICON_MAX = 16;
 
 const FAVICON_SIZES = [16, 24, 32, 48, 64, 256];
-const TRAY_SIZES = [16, 24, 32, 48, 64, 128, 256];
+const TRAY_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256];
 const TOUCH_ICON_SIZE = 180;
 
 // Every raster icon: its path under the repository root and the frame sizes it holds.

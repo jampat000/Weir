@@ -54,15 +54,15 @@ public sealed class BrowserLaunchTests : IDisposable
     }
 
     [Fact]
-    public void An_update_restart_does_not_open_the_browser()
+    public void An_update_restart_does_not_announce_itself()
     {
-        Assert.False(Program.OpensBrowser(UpdateHandOver.ThenRestart.RestartArguments));
+        Assert.False(Program.AnnouncesStart(UpdateHandOver.ThenRestart.RestartArguments));
     }
 
     [Fact]
-    public void A_start_a_person_makes_still_opens_the_browser()
+    public void A_start_a_person_makes_tells_them_Weir_is_running()
     {
-        Assert.True(Program.OpensBrowser([]));
-        Assert.True(Program.OpensBrowser(["--port", "9400"]));
+        Assert.True(Program.AnnouncesStart([]));
+        Assert.True(Program.AnnouncesStart(["--port", "9400"]));
     }
 }

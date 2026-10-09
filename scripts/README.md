@@ -44,7 +44,7 @@ work, not rewritten for its own sake. Scripts are named in kebab-case.
 | `ffmpeg-pin.mjs` | Reads the FFmpeg pin (release tag, archive names, SHA-256) from `packaging/windows/build-velopack-vendored-media-tools.ps1`, for the two scripts below (`ffmpeg-pin.test.mjs`). |
 | `ffmpeg-cache-key.mjs` | Prints the cache key for the pinned FFmpeg, the Windows package's by default or the Linux CI jobs' with `linux`: it changes exactly when the pin does. |
 | `install-ffmpeg-linux.mjs` | Downloads the pinned static Linux FFmpeg with retries, checks its SHA-256 before unpacking and installs `ffmpeg` and `ffprobe` into a folder. Run through `.github/actions/setup-ffmpeg-linux`, so no Linux job installs FFmpeg from a package mirror. |
-| `pinned-download.mjs` | Downloads a file pinned by SHA-256 from its upstream URL, or from the same-named asset of the newest Weir release when upstream no longer has it, and refuses bytes that do not match the pin (`pinned-download.test.mjs`). The Node counterpart of `packaging/windows/pinned-download.ps1`. |
+| `pinned-download.mjs` | Downloads a file pinned by SHA-256 from its upstream URL, or from the same-named asset of the newest Weir release when upstream no longer has it (found from the release feed, not the API), and refuses bytes that do not match the pin (`pinned-download.test.mjs`). The Node counterpart of `packaging/windows/pinned-download.ps1`. |
 
 ## Local development
 

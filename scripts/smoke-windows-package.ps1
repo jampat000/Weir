@@ -532,12 +532,40 @@ function Assert-WeirFirewallRule {
   Write-Host "Weir firewall rule verified after ${Because}: inbound allow, profile '$ruleProfile', scoped to $ruleProgram."
 }
 
+# The Weir and WeirServer processes running from the installed copy, whatever else runs on the machine: the package
+# folder's earlier smoke trays, a development build and the like are not the install.
+function Get-InstalledWeirProcesses {
+  param([Parameter(Mandatory)] [string]$InstallDirectory)
+  @(Get-Process -Name "Weir", "WeirServer" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and $_.Path.StartsWith($InstallDirectory + "\", [System.StringComparison]::OrdinalIgnoreCase) })
+}
+
+# Waits for the installed Weir's /ready to answer {"ready": true}.
+function Wait-ForInstalledReady {
+  param(
+    [Parameter(Mandatory)] [int]$ReadyPort,
+    [Parameter(Mandatory)] [int]$TimeoutSeconds,
+    [Parameter(Mandatory)] [string]$What
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    try {
+      $ready = Invoke-RestMethod -Uri "http://127.0.0.1:$ReadyPort/ready" -Method Get -TimeoutSec 2
+      if ($ready.ready -eq $true) { return }
+    } catch {
+      Start-Sleep -Milliseconds 500
+    }
+  } while ((Get-Date) -lt $deadline)
+  throw "$What did not answer /ready on port $ReadyPort within $TimeoutSeconds s."
+}
+
 $setupTimeoutSeconds = 120
 $weirHandleTimeoutSeconds = 30
 $installedHealthTimeoutSeconds = 90
 $lanAccessTimeoutSeconds = 90
 $localAppData = [Environment]::GetFolderPath("LocalApplicationData")
 $installedTrayExe = Join-Path $localAppData "Weir\current\Weir.exe"
+$installedDirectory = Join-Path $localAppData "Weir"
 $installedServerExe = Join-Path (Split-Path -Parent $installedTrayExe) "server\WeirServer.exe"
 $updateExe = Join-Path $localAppData "Weir\Update.exe"
 $defaultRuntimeHome = "C:\ProgramData\Weir"
@@ -573,14 +601,21 @@ try {
   if (-not (Test-Path -LiteralPath $installedTrayExe)) {
     throw "Setup.exe --silent did not install Weir.exe at $installedTrayExe."
   }
-  # --silent must not launch the app (docs.velopack.io); give any hook process a moment to exit, then
-  # confirm nothing of Weir's is running before this script starts it deliberately below.
+  # --silent must not launch the app (docs.velopack.io), and a Weir that was not running from the install is not
+  # started again either (#942); give any hook process a moment to exit, then confirm nothing of the install's is
+  # running before this script starts it deliberately below. The earlier smoke steps ran the package folder's tray
+  # and left it marked as running, which a first install must ignore.
   Start-Sleep -Seconds 2
-  $leftRunning = Get-Process -Name "Weir", "WeirServer" -ErrorAction SilentlyContinue
+  $leftRunning = Get-InstalledWeirProcesses -InstallDirectory $installedDirectory
   if ($leftRunning) {
     throw "Weir-win-Setup.exe --silent left Weir running (pid(s): $($leftRunning.Id -join ', ')); --silent must never launch the app."
   }
   Write-Host "Confirmed: --silent installed Weir without starting it."
+
+  # This build is 0.0.1-dev, so an installed tray left on Auto would download and install the newest published release
+  # after its idle minutes. Notify only downloads nothing, so no step below ever installs a published release.
+  New-Item -ItemType Directory -Path $defaultRuntimeHome -Force | Out-Null
+  Set-Content -LiteralPath (Join-Path $defaultRuntimeHome "update-settings.json") -Value '{ "mode": "NotifyOnly" }' -Encoding ASCII
 
   Write-Host "Starting the installed Weir.exe --silent, its output piped the same way..."
   $weirPsi = New-Object System.Diagnostics.ProcessStartInfo
@@ -669,6 +704,45 @@ try {
   }
   Assert-WeirFirewallRule -ServerExe $installedServerExe -Because "--configure-firewall"
 
+  # Setup --silent over a Weir that is running from the install (#942): Setup stops it and starts nothing itself, so
+  # the tray has to bring Weir back, as an update driven by Deluno needs. The uninstall below stops it in an orderly way.
+  Write-Host "Starting the installed Weir.exe, then running Setup.exe --silent over it..."
+  $runningProc = Start-Process -FilePath $installedTrayExe -ArgumentList @("--port", [string]$Port, "--no-browser", "--silent") -PassThru -WindowStyle Hidden
+  Wait-ForInstalledReady -ReadyPort $Port -TimeoutSeconds $installedHealthTimeoutSeconds -What "The installed Weir before the second Setup"
+  # Setup runs with its output piped, as Deluno runs it, and is waited for on its own: Start-Process -Wait in Windows
+  # PowerShell also waits for everything Setup's hook starts, which here includes the Weir that comes back.
+  $overInstallPsi = New-Object System.Diagnostics.ProcessStartInfo
+  $overInstallPsi.FileName = $setupExePath
+  $overInstallPsi.Arguments = "--silent"
+  $overInstallPsi.UseShellExecute = $false
+  $overInstallPsi.RedirectStandardOutput = $true
+  $overInstallPsi.RedirectStandardError = $true
+  $overInstallPsi.CreateNoWindow = $true
+  $overInstallProc = [System.Diagnostics.Process]::Start($overInstallPsi)
+  $overInstallStdoutTask = $overInstallProc.StandardOutput.ReadToEndAsync()
+  $overInstallStderrTask = $overInstallProc.StandardError.ReadToEndAsync()
+  if (-not $overInstallProc.WaitForExit($setupTimeoutSeconds * 1000)) {
+    Stop-Process -Id $overInstallProc.Id -Force -ErrorAction SilentlyContinue
+    throw "Weir-win-Setup.exe --silent over a running Weir did not exit within $setupTimeoutSeconds s."
+  }
+  if ($overInstallProc.ExitCode -ne 0) {
+    throw "Weir-win-Setup.exe --silent over a running Weir exited with code $($overInstallProc.ExitCode)."
+  }
+  if (-not $runningProc.HasExited) {
+    throw "Setup.exe --silent did not stop the running Weir.exe (pid $($runningProc.Id))."
+  }
+  Wait-ForInstalledReady -ReadyPort $Port -TimeoutSeconds $installedHealthTimeoutSeconds -What "Weir after a silent Setup over it"
+  $restarted = @(Get-InstalledWeirProcesses -InstallDirectory $installedDirectory | Where-Object { $_.Name -eq "Weir" })
+  if ($restarted.Count -ne 1 -or $restarted[0].Id -eq $runningProc.Id) {
+    throw "Expected one new Weir.exe from the install after the silent Setup; found: $($restarted.Id -join ', ')."
+  }
+  Write-Host "Setup.exe --silent over a running Weir: it came back by itself (pid $($restarted[0].Id)) and answers /ready."
+
+  # Weir is running again, so a pipe that reaches end-of-file now is not held open by the helper that restarted it or
+  # by Weir itself: a caller capturing Setup's output, as Deluno does, is not kept waiting for as long as Weir runs.
+  Wait-ForPipeEndOfFile -Tasks @($overInstallStdoutTask, $overInstallStderrTask) -TimeoutSeconds 15 -What "Setup.exe's piped output while the restarted Weir runs"
+  Write-Host "Setup.exe's piped stdout and stderr reached end-of-file while the restarted Weir keeps running."
+
   Write-Host "Uninstalling with the Velopack uninstaller..."
   if (-not (Test-Path -LiteralPath $updateExe)) {
     throw "Velopack updater not found at $updateExe; cannot uninstall."
@@ -678,6 +752,10 @@ try {
     throw "Update.exe uninstall --silent exited with code $($uninstallProc.ExitCode)."
   }
   Write-Host "Uninstalled cleanly (exit code 0)."
+  $leftAfterUninstall = Get-InstalledWeirProcesses -InstallDirectory $installedDirectory
+  if ($leftAfterUninstall) {
+    throw "Uninstalling left Weir running (pid(s): $($leftAfterUninstall.Id -join ', '))."
+  }
 
   # Uninstall's before-uninstall hook removes the firewall rule itself when already elevated (this runner is);
   # see Weir.Tray/Firewall/FirewallInstallHooks.cs RemoveRuleIfElevated. A rule surviving uninstall would point at a program
@@ -696,6 +774,10 @@ try {
   }
   throw
 } finally {
+  # A failed run must not leave the installed Weir running on a machine that is reused.
+  foreach ($left in Get-InstalledWeirProcesses -InstallDirectory $installedDirectory) {
+    & taskkill.exe /PID $left.Id /T /F | Out-Null
+  }
   # Velopack's uninstall does not remove runtime data (docs-site/docs/deployment/windows.md,
   # "Uninstalling leaves the runtime data ... in place"); remove it so the runner is left clean.
   if (Test-Path -LiteralPath $defaultRuntimeHome) {

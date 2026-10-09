@@ -51,7 +51,7 @@ You need 64-bit Windows 10 or 11. You do not need administrator rights to instal
 3. Weir installs for your user account and starts. Its icon appears in the system tray, next to the clock.
 4. **Weir asks for a port.** Keep **9347** unless something else uses it.
 5. **Windows asks for permission once.** Weir answers on this PC only until you let other devices in, and the first start asks whether you want to. Say yes if you want to open Weir from your phone or another computer. Windows asks for administrator approval, and Weir adds one firewall rule named **Weir** that covers every network type. Say no if you only use Weir on this PC. You can change your mind later in **System › About**, by choosing **Devices on my network** or **This PC only**, or from the tray icon's menu.
-6. Your browser opens Weir at [http://localhost:9347](http://localhost:9347).
+6. A notice from the tray icon says Weir is running. Click it, or the icon, and your browser opens Weir at [http://localhost:9347](http://localhost:9347). Weir never opens a browser window by itself.
 
 | | |
 |--|--|
@@ -61,13 +61,13 @@ You need 64-bit Windows 10 or 11. You do not need administrator rights to instal
 
 Your data lives outside the program folder on purpose, so updating the program never touches it. Weir runs as you, in your own sign-in session, and not as a Windows service. That way it can reach your mapped network drives.
 
-Click the tray icon to open Weir. Right-click it to open the data folder, change the port, allow other devices, check for updates or quit. The [Windows guide](docs/install-windows.md) has the details, including how to install Weir from a script.
+Click the tray icon to open Weir. Right-click it to pause processing, restart Weir, copy its address, open the data or logs folder, change the port, allow other devices, start Weir with Windows, check for updates or quit. The [Windows guide](docs/install-windows.md) has the details, including how to install Weir from a script.
 
 ## Install with Docker
 
 Images are published to GitHub's container registry as `ghcr.io/jampat000/weir`, for 64-bit Intel/AMD (`amd64`) and ARM (`arm64`). That covers Synology, Unraid, TrueNAS, Linux servers and a Raspberry Pi running a 64-bit system.
 
-Use a version tag such as `1.0.0-rc.10`. Release candidates are published under their version tag only, so `latest` does not exist yet. It arrives with 1.0.0 and will follow stable releases. The tag has no `v`: the release `v1.0.0-rc.10` is the image `1.0.0-rc.10`. Newer ones are on the [Releases page](https://github.com/jampat000/Weir/releases).
+Use a version tag such as `1.0.0-rc.11`. Release candidates are published under their version tag only, so `latest` does not exist yet. It arrives with 1.0.0 and will follow stable releases. The tag has no `v`: the release `v1.0.0-rc.11` is the image `1.0.0-rc.11`. Newer ones are on the [Releases page](https://github.com/jampat000/Weir/releases).
 
 ### Getting the folders right first
 
@@ -99,7 +99,7 @@ docker run -d \
   -v "$(pwd)/weir-data:/data/weir" \
   -v /srv/media:/media \
   --restart unless-stopped \
-  ghcr.io/jampat000/weir:1.0.0-rc.10
+  ghcr.io/jampat000/weir:1.0.0-rc.11
 ```
 
 Then open `http://<server>:9347`, where `<server>` is the name or address of the machine running Docker.
@@ -115,7 +115,7 @@ This puts a qBittorrent container beside Weir, with the shared folder laid out a
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.10
+    image: ghcr.io/jampat000/weir:1.0.0-rc.11
     container_name: weir
     hostname: my-server
     ports:

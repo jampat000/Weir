@@ -18,14 +18,14 @@ Pick whichever fits where you run it.
 
 ### Docker (Synology, Unraid, TrueNAS, Raspberry Pi, Linux servers)
 
-Weir is at release-candidate stage, and a release candidate is published under its version tag only, so the example below name `1.0.0-rc.10`. The `latest` tag arrives with 1.0.0.
+Weir is at release-candidate stage, and a release candidate is published under its version tag only, so the example below name `1.0.0-rc.11`. The `latest` tag arrives with 1.0.0.
 
 Make a folder, save this as `compose.yaml` inside it:
 
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.10
+    image: ghcr.io/jampat000/weir:1.0.0-rc.11
     container_name: weir
     hostname: my-server   # what Weir calls itself: "Weir on my-server"
     ports:
@@ -50,7 +50,7 @@ mounts them, plus the recipe for running Weir alongside Sonarr, Radarr and a dow
 1. Download `Weir-win-Setup.exe` from the newest release on the [releases page](https://github.com/jampat000/Weir/releases). Weir is in pre-release (1.0.0-rc.N), and GitHub's "latest release" link does not show pre-releases.
 2. Run it. You don't need admin rights.
 3. Weir asks which port to use the first time it starts. Keep **9347** unless something else uses it.
-4. Your browser opens Weir.
+4. A notice from the tray icon says Weir is running. Click it, or the icon, and your browser opens Weir.
 
 See the [Windows installer guide](deployment/windows) for what gets installed, how updates work,
 and unattended installs.

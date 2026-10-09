@@ -275,7 +275,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     /// <c>POST /intake/handoffs/{source_key}/{handoff_id}/outcome</c> (#652, agreed with Deluno): the manager
     /// says what became of the file Weir handed back. <c>imported</c> records it and releases Weir's copy when that is safe;
     /// <c>not-imported</c> records it and keeps the copy, and a later <c>imported</c> replaces it (#928). The same outcome
-    /// sent again gets the same 200; a hand-off never received is 404; one not finished, or with a different outcome
+    /// sent again gets the same 200, unless a retry has since handed back a copy the manager has said nothing about, which it records; a hand-off never received is 404; one not finished, or with a different outcome
     /// already recorded that cannot be replaced, is 409 with a <c>code</c> saying which (#664); a body that cannot be read
     /// is 422. Authenticated by <c>X-Webhook-Secret</c>, like the other hand-off routes.
     /// </summary>
@@ -309,10 +309,11 @@ internal sealed class MediaManagerIntakeEndpointHandlers
 
         // The write lock comes first: two outcomes for one hand-off racing each other must not both read "nothing recorded",
         // or a late refusal could overwrite an import, and two imports could each release the same copy.
-        (await request.DbAsync().ConfigureAwait(false)).BeginImmediate();
+        await (await request.DbAsync().ConfigureAwait(false)).BeginImmediateAsync().ConfigureAwait(false);
         var (uow, key, row) = await RequireHandoffAsync(request).ConfigureAwait(false);
         var manager = ManagerName(key);
-        if (row.Outcome is { } recorded && !HandbackRules.Supersedes(recorded, outcome))
+        if (row.Outcome is { } recorded && !HandbackRules.Supersedes(recorded, outcome) &&
+            !(recorded == outcome && await _handbackOutcomes.HasUnansweredCopyAsync(uow, row).ConfigureAwait(false)))
         {
             if (recorded != outcome)
             {
@@ -330,10 +331,10 @@ internal sealed class MediaManagerIntakeEndpointHandlers
         }
 
         var status = await _intake.Ledger.CurrentStatusAsync(uow, row).ConfigureAwait(false);
-        if (status.State is not (HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough))
+        var ended = HandoffLedgerRules.TerminalStates.Contains(status.State);
+        if (status.State is not (HandoffLedgerRules.Completed or HandoffLedgerRules.PassedThrough) && !(ended && HandoffLedgerStore.HandedBackFile(row)))
         {
             await request.CommitAsync().ConfigureAwait(false);
-            var ended = HandoffLedgerRules.TerminalStates.Contains(status.State);
             throw new ApiException(
                 StatusCodes.Status409Conflict,
                 ended

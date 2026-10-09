@@ -24,7 +24,7 @@ Copy this list into the run's record and tick each line with what was seen.
    - [ ] The picker shows progress and a finish screen, and offers to open Deluno.
    - [ ] Weir answers on this PC only, and its tray starts silently.
 2. **Clients come up ready.**
-   - [ ] Each client has the Movies and TV categories and the documented folders (`C:\Downloads\Completed\<cat>`, `D:\Incomplete\<client>`).
+   - [ ] Each client has the Movies and TV categories and the documented folders (`C:\Downloads\Completed\<cat>`, `C:\Downloads\Incomplete\<client>`).
    - [ ] Deluge's Label plugin is on.
    - [ ] Library Routing's folder check shows every folder as Matches.
 3. **Account and guided setup, end to end.**
@@ -51,7 +51,7 @@ Copy this list into the run's record and tick each line with what was seen.
    - [ ] Remove a title with its files, restore it from the recycle bin, and the title is back.
 9. **Weir's pause and repeats.**
    - [ ] Pause Weir "until I resume" with **Keep looking for new files** on. A hand-off during the pause waits, and nothing is processed or removed. On resume it is processed once. Weir's Activity shows Paused and Resumed.
-   - [ ] Send a hand-off again for a file already cleaned. It settles as "Skipped: already done", with no second output, and Deluno gets the same cleaned copy.
+   - [ ] In Weir, **Process again** on a file already cleaned settles as "Skipped: already done", with no second output. Deluno never sends a finished hand-off a second time, so the repeat is started from Weir.
 10. **Reaching Weir from another computer.**
     - [ ] In Weir's **System › About**, **Devices on my network** makes Weir reachable from another computer, with the VM's network set to Public.
 11. **Screens.**
@@ -72,6 +72,10 @@ Copy this list into the run's record and tick each line with what was seen.
 Deluno's `scripts/golden-path/Invoke-GoldenPath.ps1 -RigHost <host> -InstallerPath <Setup.exe> -Version <version>` does the mechanical part of step 1 and leaves the VM running for the rest. It restores the clean checkpoint, starts the VM and waits for PowerShell Direct, copies the installer in (and checks its SHA256), installs it with `--silent`, starts Deluno in the VM's signed-in desktop session, and checks that the installed build is the version under test, that Deluno answers on its port, what the first-run state is, which components are installed (with versions), where their data folders are and which ports listen. It writes `golden-path-<version>-<date>.md` under `artifacts/`, one line per step: passed, failed or manual.
 
 It cannot tick the component picker: Setup.exe and the app take no component choice on the command line, and a silent Setup does not run the first-run hook that shows the picker or sets the firewall rule. So after the script, step 1's picker lines and everything from step 2 on are done by hand in the VM console; the script's results file lists each as manual. Steps 2 to 12 stay manual.
+
+## The Usenet film
+
+The VM has no news server and no Usenet account, and no real login is ever used. Step 5's indexer line and step 6's Usenet film use a stub that runs inside the VM, the way the torrent films use a small local Torznab feed: a news server on `127.0.0.1` (port 1119) that serves a Creative Commons film (Big Buck Bunny, 2008) as yEnc articles, and a Newznab indexer on `127.0.0.1` (port 1180) that offers it with its `.nzb`. The film is about 1.58 GiB and named for WEB 1080p. That fits Deluno's own size rule both ways: above its minimum for that quality when the runtime is unknown (1.5 GB), and below its maximum for Big Buck Bunny's real 8-minute runtime (about 1.67 GB). So Deluno picks it by itself and the run needs no "Send anyway". Run Deluno's script with `-UsenetStub` (and `-DelunoUsername`/`-DelunoPassword`, the run's throwaway login, once the account exists). It makes the release with the ffmpeg Deluno ships, starts both stubs in the signed-in session, and points Deluno at them through Deluno's own API. Without the login it prints the one command to run later (`Set-UsenetStubInDeluno.ps1`, in `C:\golden\usenet-stub` in the VM). The stub's code is `scripts/golden-path/usenet-stub/` in Deluno; Weir needs nothing from it, because Weir only sees the finished download in the client's folder.
 
 ## After the run
 

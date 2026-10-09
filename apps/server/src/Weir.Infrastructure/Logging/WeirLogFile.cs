@@ -115,25 +115,39 @@ public sealed class WeirLogFile : IDisposable
         }
     }
 
+    /// <summary>
+    /// The lines inside the window are written to a scratch file while writers keep appending; the write lock is taken only
+    /// to carry over what was appended meanwhile and swap the scratch file in, so logging never waits for a copy of the
+    /// whole log.
+    /// </summary>
     private bool Rewrite(DateTimeOffset cutoff)
     {
-        lock (_lock)
+        string? temporary = null;
+        try
         {
-            _stream?.Dispose();
-            _stream = null;
-            string? temporary = null;
-            try
+            long length;
+            lock (_lock)
             {
                 if (!File.Exists(Path))
                 {
+                    _stream?.Dispose();
+                    _stream = null;
                     return true;
                 }
 
-                temporary = System.IO.Path.Join(
-                    System.IO.Path.GetDirectoryName(Path),
-                    $".{System.IO.Path.GetFileName(Path)}.{Guid.NewGuid():N}.prune");
-                using (var reader = new StreamReader(Path, Encoding.UTF8))
-                using (var writer = new StreamWriter(temporary, append: false, new UTF8Encoding(false)))
+                _stream?.Flush();
+                length = new FileInfo(Path).Length;
+            }
+
+            temporary = System.IO.Path.Join(
+                System.IO.Path.GetDirectoryName(Path),
+                $".{System.IO.Path.GetFileName(Path)}.{Guid.NewGuid():N}.prune");
+            var rewritten = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            try
+            {
+                using (var source = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var reader = new StreamReader(new BoundedReadStream(source, length), Encoding.UTF8))
+                using (var writer = new StreamWriter(rewritten, new UTF8Encoding(false), leaveOpen: true))
                 {
                     writer.NewLine = "\n";
                     while (reader.ReadLine() is { } raw)
@@ -145,29 +159,49 @@ public sealed class WeirLogFile : IDisposable
                     }
                 }
 
-                File.Move(temporary, Path, overwrite: true);
-                temporary = null;
-                return true;
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                if (temporary is not null)
+                lock (_lock)
                 {
-                    try
+                    _stream?.Dispose();
+                    _stream = null;
+                    using (var appended = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                     {
-                        File.Delete(temporary);
+                        appended.Seek(length, SeekOrigin.Begin);
+                        appended.CopyTo(rewritten);
                     }
-                    catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
-                    {
-                        // Best effort: a leftover temporary file does no harm.
-                    }
-                }
 
-                return false;
+                    rewritten.Dispose();
+                    File.Move(temporary, Path, overwrite: true);
+                }
             }
             finally
             {
-                if (!_disposed)
+                rewritten.Dispose();
+            }
+
+            temporary = null;
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            if (temporary is not null)
+            {
+                try
+                {
+                    File.Delete(temporary);
+                }
+                catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+                {
+                    // Best effort: a leftover temporary file does no harm.
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                if (!_disposed && _stream is null)
                 {
                     _stream = OpenForAppend(Path);
                 }
@@ -221,32 +255,53 @@ public sealed class WeirLogFile : IDisposable
 
     /// <summary>
     /// Copies the log to <paramref name="destinationPath"/> as a byte-for-byte snapshot, so a caller can hand it to
-    /// something slow (a download to a browser) without holding up logging for as long as that takes. The lock is
-    /// held only for the copy itself, not for whatever happens to the destination file afterwards; a plain file
-    /// copy is also far cheaper per line than <see cref="ReadLines"/>, which re-splits and re-allocates every line.
+    /// something slow (a download to a browser) without holding up logging for as long as that takes. Writers keep
+    /// appending while it copies, and the snapshot ends at the last whole line written when it began; a prune waits
+    /// until it is done. A plain file copy is also far cheaper per line than <see cref="ReadLines"/>, which
+    /// re-splits and re-allocates every line.
     /// A log that has not been written yet is not a failure: the destination is created empty. Returns
     /// <see langword="false"/> only when the log file exists but could not be read.
     /// </summary>
     public bool SnapshotTo(string destinationPath)
     {
         ArgumentException.ThrowIfNullOrEmpty(destinationPath);
-        lock (_lock)
+        _replacing.EnterReadLock();
+        try
         {
-            if (!File.Exists(Path))
+            FileStream source;
+            long length;
+            lock (_lock)
             {
-                using (File.Create(destinationPath))
+                if (!File.Exists(Path))
                 {
+                    using (File.Create(destinationPath))
+                    {
+                    }
+
+                    return true;
                 }
 
-                return true;
+                _stream?.Flush();
+                try
+                {
+                    source = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    return false;
+                }
+
+                length = source.Length;
             }
 
-            _stream?.Flush();
             try
             {
-                using var source = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                using var destination = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                source.CopyTo(destination);
+                using (source)
+                using (var destination = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    new BoundedReadStream(source, length).CopyTo(destination);
+                }
+
                 return true;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -262,6 +317,10 @@ public sealed class WeirLogFile : IDisposable
 
                 return false;
             }
+        }
+        finally
+        {
+            _replacing.ExitReadLock();
         }
     }
 

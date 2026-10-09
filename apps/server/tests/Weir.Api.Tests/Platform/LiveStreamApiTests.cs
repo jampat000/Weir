@@ -195,4 +195,23 @@ public sealed class LiveStreamApiTests
         using var resumed = await client.PutAsync("/api/v1/pause", new { csrf_token = await client.CsrfAsync(), paused = false });
         await AssertTopicArrivesAsync(reader, DataTopics.Pause);
     }
+
+    [Fact]
+    public async Task Removing_a_failed_file_from_the_list_reaches_an_open_stream_as_a_jobs_change()
+    {
+        var (server, client) = await StartSignedInAsync();
+        await using var _server = server;
+        var libraryId = await TestDatabase.ScalarAsync(server, "INSERT INTO libraries (name, media_type) VALUES ('Films', 'movie') RETURNING id");
+        var fileId = await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, status_reason, last_seen_at) " +
+            $"VALUES ({libraryId}, 'Film/film.mkv', 'processing_failed', 'Weir could not read the audio track.', CURRENT_TIMESTAMP) RETURNING id");
+        using var reader = await OpenStreamAsync(server, client);
+        await NextFrameAsync(reader, "server.hello");
+
+        using var removed = await client.SendAsync(HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync() });
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, removed.StatusCode);
+        await AssertTopicArrivesAsync(reader, DataTopics.Jobs);
+    }
 }

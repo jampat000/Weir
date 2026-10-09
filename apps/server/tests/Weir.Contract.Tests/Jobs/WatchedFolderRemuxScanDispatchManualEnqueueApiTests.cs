@@ -25,6 +25,24 @@ public sealed class WatchedFolderRemuxScanDispatchManualEnqueueApiTests(ServerFi
     }
 
     [Fact]
+    public async Task Scan_now_on_a_watched_folder_that_is_gone_says_so_where_the_person_clicked()
+    {
+        using var folders = new TemporaryFolder();
+        var watched = Directory.CreateDirectory(Path.Combine(folders.Path, "w_scan_gone")).FullName;
+        var output = Directory.CreateDirectory(Path.Combine(folders.Path, "out_scan_gone")).FullName;
+        using var admin = await fixture.Server.CreateAdminClientAsync();
+        await JobsApi.SetMovieFoldersAsync(admin, watched, output);
+        Directory.Delete(watched);
+
+        var response = await admin.PostWithCsrfAsync(Enqueue, new JsonObject());
+
+        JobsApi.Expect(response, HttpStatusCode.BadRequest);
+        var detail = (string)response.Fields["detail"]!;
+        Assert.Contains("can't see the watched folder", detail, StringComparison.Ordinal);
+        Assert.Contains(watched, detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Watched_folder_scan_enqueue_ok()
     {
         using var folders = new TemporaryFolder();

@@ -162,11 +162,19 @@ breaking changes.
 
 ### Which version an install is offered
 
-Weir's own update check reads the GitHub release list (not `/releases/latest`, which never returns a
-pre-release) and offers the newest release by SemVer precedence, skipping drafts. An install running a
-pre-release is offered pre-releases and stable releases; an install running a stable version is offered stable
-releases only. The tray's Velopack update source follows the same rule. Docker installs are never updated in
-place: System › About names the newest tag and the pull command.
+Weir's own update check reads the public release feed (`https://github.com/jampat000/Weir/releases.atom`) and
+offers the newest release by SemVer precedence, skipping drafts. An install running a pre-release is offered
+pre-releases and stable releases; an install running a stable version is offered stable releases only. The feed
+has no pre-release flag, so a release is a pre-release when its tag has a pre-release suffix (`-rc.1`). The
+tray's Velopack update source follows the same rule: it takes the newest tag from the feed and reads
+`releases.win.json` and the packages from that release's `releases/download/<tag>/` folder.
+
+Neither the feed nor the download folder counts against GitHub's API allowance (60 an hour without a token,
+shared by every Weir, tray and other GitHub client on a network, and a conditional request that answers 304
+still costs one). The API's release list (not `/releases/latest`, which never returns a pre-release) is asked
+only when the feed cannot be read; if GitHub is limiting the network by then, System › About says when Weir
+will check again. Docker installs are never updated in place: System › About names the newest tag and the pull
+command.
 
 Local Docker is not required for this release path. Docker build, publish,
 manifest verification, and container smoke testing all run on GitHub-hosted
@@ -306,7 +314,7 @@ After installing:
 2. Weir starts in the user session, not as a Windows service.
 3. The .NET tray app (`Weir.exe`) launches the Weir server (`server\WeirServer.exe`) as a child process, watches it, and restarts it if it stops.
    Every deliberate stop (the LAN access toggle, Change port, Restart to update, Quit, and `--allow-lan` on a running Weir) asks the server to stop by setting its named event `Local\Weir-Stop-<server pid>` and waits up to 10 s for it to exit, so hosted services, running jobs and the database close in order. Only a server that does not exit in time, or cannot be asked, is killed. `tray-host.log` says which happened: `stopped cleanly in 0.3 s` or `did not stop in 10.0 s; killing it`. The event is per user and per Windows session; the server has no HTTP route that stops it.
-4. The tray icon opens the local app in the browser and exposes `Open Weir`, `Open Data Folder`, `Change port`, `Check for updates`, and `Quit`.
+4. The tray icon opens the local app in the browser and exposes the menu in [`tray-standard.md`](tray-standard.md): `Open Weir`, Pause or Resume processing, `Restart Weir`, `Copy address`, the LAN access items, `Change port`, the data and logs folders, `Start with Windows`, the update item, the version, `Report a problem...` and `Quit Weir`. The installer turns nothing on at sign-in by itself: the first run asks whether to start Weir with Windows, and Setup `--silent` never asks.
 5. Application binaries install under `%LocalAppData%\Weir` (per-user, no admin required).
 6. The local runtime root is created under `C:\ProgramData\Weir`.
 
@@ -334,6 +342,17 @@ Once an update is downloaded in **Auto** mode the tray waits for Weir to be idle
 
 How the tray learns Weir is idle: while `update-state.json` says an update is downloaded, the server rewrites `work-state.json` in the data folder every 15 seconds with `busy` and the time it looked (`checkedAt`). Nothing is written when no update is waiting, so a Docker install never writes it. The tray installs only on a fresh answer of idle; a missing, unreadable or over-a-minute-old file (the server stopped, restarting or stuck) counts as not idle and restarts the 5 minutes. It is a file and not an HTTP route on purpose: the tray has no signed-in session, an unauthenticated route would be reachable from other devices whenever LAN access is on, and the data folder is readable only by the account running Weir. What counts as file work is decided by the same rules the worker slots use to lease a job (`ProcessingJobStore.HasFileWorkAsync`), so "could start" and "would start" cannot differ.
 
+How the tray learns what to show, and how it pauses Weir: two more files in the data folder, with the same reasoning as `work-state.json` (the tray has no signed-in session, and no route carries them).
+
+- `tray-status.json` is written by the server whenever its contents change, at most once a second, whole to a scratch file and then renamed into place, so the tray never reads half of it. It is written when the server starts and a last time, with `server_ok` false, when it stops cleanly; a server that was killed leaves `server_ok` true. Keys are snake_case:
+
+  ```json
+  {"paused":false,"paused_until":null,"needs_you":{"files":2,"managers_unreachable":["Deluno on RIG"]},"server_ok":true}
+  ```
+
+  `paused_until` is an ISO 8601 UTC time for a timed pause and null otherwise. `needs_you.files` counts the files that wait on a person, the same files as the sidebar badge (`FileStateStore.CountWaitingOnPersonAsync`). `managers_unreachable` names the enabled media managers whose last connection test, by the heartbeat or the Test button, got no answer.
+- `pause-request.json` is written by the tray: `{"paused": true, "requested_at": "<ISO 8601>"}`, or `false` to resume. The server applies it through `SuitePauseService` as "the tray": a pause lasts until it is resumed and leaves "keep looking for new files" as it stands. Activity records it like any other pause or resume, saying the tray did it, and the file is deleted once that has worked; if it has not, the request stays and is tried again every couple of seconds. Both keys are required. A request is answered once (the server remembers the last `requested_at` it applied), one made more than 2 minutes ago is dropped, so a file left while the server was down is answered when it starts only if it is fresh, and a file that is not that shape is ignored, noted in the log, and deleted. A file the tray rewrites while the server is answering is left in place and answered next.
+
 If an operator runs a manually staged copy without Velopack install metadata, the
 tray keeps `Check for updates` visible and sends it to the browser-based release check
 on **System › About**. It must not silently remove the update action.
@@ -352,7 +371,7 @@ Weir-win-Setup.exe --silent
 ```
 
 Exits 0 on success, non-zero on failure, within seconds — `--silent` also skips Velopack's
-post-install app launch, so nothing here waits on Weir itself. Start Weir explicitly afterward, and
+post-install app launch, so nothing here waits on Weir itself. After a first install, start Weir explicitly, and
 watch for it becoming ready rather than for the process to exit — it is a foreground app that keeps
 running once started, exactly like a person's own copy:
 
@@ -365,6 +384,14 @@ tab — regardless of whether the session looks interactive. Poll `GET http://12
 until it answers `{"ready": true}` (a healthy start typically takes a few seconds; 60 seconds is a
 generous timeout). An early exit means the start failed; its exit code is non-zero and
 `tray-host.log` under the runtime home (`C:\ProgramData\Weir` by default) says why.
+
+**Over a running Weir (#942).** Setup stops the running Weir, tray and server, before it runs any hook, and starts the new Weir itself only when it is not silent. So a silent Setup over a running Weir would leave it stopped. To prevent that, a Setup `--silent` over a Weir that was running starts Weir again, and one over a Weir that was not running leaves it stopped:
+
+- **Knowing it was running.** The tray sets a mark, the volatile registry key `HKCU\SOFTWARE\WeirTrayRunning`, when it starts, and clears it when it exits in order (Quit, an update, the end of the Windows session). The mark records the tray's process id, its start time and the `Weir.exe` it runs from. Setup ends the tray without clearing it, so the new version's after-install hook counts Weir as running only when the mark names the `Weir.exe` of the install being upgraded (`<install>\current\Weir.exe`, compared without regard to case) and that process is no longer running. A tray run from anywhere else (a portable copy, the package folder, a development build) never counts, so a first install starts nothing. Uninstalling clears the mark. A restart or a sign-out removes the key, so a Weir that was off before the PC restarted is never mistaken for a running one. A tray that crashed also leaves the mark, so a silent Setup after a crash starts Weir.
+- **Starting it.** The hook cannot start the tray itself, because Setup stops everything running from the install folder again as soon as the hook ends. It starts a PowerShell from System32 instead, through the shell so that it inherits none of Setup's handles: a caller capturing Setup's output sees it reach end-of-file as soon as Setup exits, while Weir keeps running. That PowerShell waits for Setup to exit and then starts `Weir.exe --no-browser --after-setup`: the saved port and data folder, no browser and no balloon, as at sign-in.
+- **A plain Setup keeps Velopack's own start.** Velopack has already started Weir by the time Setup exits, and a start carrying `--after-setup` does nothing when a tray from this install is running.
+
+`tray-host.log` says which happened: `Weir was running before this install. It starts again once Setup ...`, `Weir was not running from this install before Setup, so it is left stopped.` or `Start after Setup: Weir is already running, so this start has nothing to do.` A caller that starts Weir itself after Setup, as above, stays right: that second start does nothing.
 
 **Don't wait on the process tree.** Weir keeps running after Setup exits — that is correct, not a
 hang — so a caller must wait for Setup's own exit (or, for the second command above, for `/ready` or

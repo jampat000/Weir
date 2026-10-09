@@ -56,7 +56,7 @@ public sealed partial class RemuxPassHandler
                 .Set("preflight_status", "failed")
                 .Set("preflight_reason", sentence)
                 .Set("reason", sentence)
-                .Set("rejection_kind", "unreadable_file");
+                .Set("rejection_kind", RejectionKinds.UnreadableFile);
             _logger.LogWarning("A file stayed unreadable after {Looks} looks, so Weir refused it: job {JobId}.", looks, jobId);
             return;
         }

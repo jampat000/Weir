@@ -35,15 +35,20 @@ Weir runs in the user session, not as a Windows service. This avoids common NAS 
 
 The tray app (`Weir.exe`) starts the Weir server (`server\WeirServer.exe`, a self-contained .NET program) as a child process with `--port <port>`, listening for this PC only unless [LAN access](#firewall-and-lan-access) is on. It watches the server and restarts it if it stops unexpectedly. The server creates or updates its SQLite database itself when it starts.
 
-The tray icon provides:
-- **Open Weir** — opens the web UI in your browser (so does clicking the icon)
-- **Open Data Folder** — opens the runtime data directory
-- **Change port** — moves Weir to a different port and restarts it (the current port is shown in the menu)
+The tray icon carries a small mark in its corner only when something is different: a grey ring while Weir starts, two bars while processing is paused, a red dot when something needs you (Weir stopped, a connected media manager such as Deluno cannot be reached, or files are on hold or failed), a blue dot when a downloaded update is waiting. One mark shows at a time, in that order of priority. Hover over the icon for the state in words. The menu follows the tray standard Weir and Deluno share (`docs/tray-standard.md` in the repository):
+- **Open Weir** — opens the web UI in your browser (so does clicking the icon); below it, a greyed line with the state
+- **Pause processing** / **Resume processing** — stops or restarts new processing work
+- **Restart Weir** — stops the server cleanly and starts it again on the same port; also the way back if Weir stopped and could not start again by itself
+- **Copy address** — copies the address to open Weir (the PC's name when other devices are allowed in)
 - **Allow other devices on your network...** and **Only allow this PC** — see [Firewall and LAN access](#firewall-and-lan-access)
-- **Check for updates** — checks GitHub for a newer release; once one is found the item becomes **Download update**, then **Restart to update**
-- **Quit** — stops Weir, and applies an update that has already downloaded
+- **Change port** — moves Weir to a different port and restarts it (the current port is shown in the menu); a notice offers the new address to open
+- **Open data folder** and **Open logs folder**
+- **Start with Windows** — a tick you can switch at any time; see [Starting with Windows](#starting-with-windows)
+- **Check for updates** — checks GitHub for a newer release; once one is found the item becomes **Download update**, then **Restart to update**; below it, the greyed version
+- **Report a problem...** — opens the logs folder
+- **Quit Weir** — stops Weir after running jobs finish, and applies an update that has already downloaded
 
-Every stop the tray does itself (Quit, Change port, the LAN access items and Restart to update) asks the
+Every stop the tray does itself (Quit, Restart Weir, Change port, the LAN access items and Restart to update) asks the
 server to shut down and waits up to 10 seconds, so running work and the database close in order. Only a
 server that does not exit in that time is ended by force. `tray-host.log` in `C:\ProgramData\Weir` says which
 happened: `stopped cleanly in 0.3 s`, or `did not stop in 10.0 s; killing it`.
@@ -56,7 +61,7 @@ The tray app installs updates itself, using Velopack:
 - No admin privileges required for updates
 - **System › About** shows the running version, the latest release and its release notes, and has
   the **Update mode** setting: **Auto**, **Download only** or **Notify only**. Auto is the default.
-- Weir starts again after an update without opening your browser, so an update never leaves a window behind on a computer nobody is watching. Starting Weir yourself still opens it.
+- Weir starts again after an update without opening your browser, so an update never leaves a window behind on a computer nobody is watching. Starting Weir yourself shows a notice from the tray icon instead, and clicking it opens Weir. No start ever opens a browser window by itself.
 
 ## Firewall and LAN access
 
@@ -155,7 +160,7 @@ on, so the tray asks instead, the first time it starts:
 Your choice is saved in `C:\ProgramData\Weir\port.txt` and used on every start after that. Weir
 never moves to a different port on its own: if the saved port is busy on a later start, it tells you
 which port is busy and asks again. To move Weir later, use **Change port** in the tray menu; Weir
-restarts on the new port and opens it in your browser. If the server cannot start on the new port,
+restarts on the new port and offers the new address in a notice; clicking the notice opens it. If the server cannot start on the new port,
 Weir goes back to the old one and says so.
 
 ### Installing Weir from another program
@@ -176,6 +181,11 @@ nothing and should not be used. Setup then exits on its own within seconds: **0 
 non-zero on failure.** Nothing here waits on Weir itself, so there is no risk of Setup hanging on a
 long-running app. `--installto <dir>` overrides the install directory if you need one other than the
 per-user default (`%LocalAppData%\Weir`).
+
+Setup stops a Weir that is running before it installs. When Weir was running, a silent install starts
+it again once Setup has exited, on the same port and with no browser window, so an update never
+leaves it stopped; when it was not running, it stays stopped. A program that starts Weir itself
+afterwards, as below, is still right: that second start does nothing.
 
 Weir is a foreground desktop app, not a Windows service (see "How it runs" above): once started it
 keeps running, the same as it does for a person at a desktop. After a silent install, start it
@@ -231,9 +241,12 @@ still pass it.
 
 ## Starting with Windows
 
-Installing or updating Weir registers it to start when you sign in to Windows, as a `Weir` entry
-under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. That start passes `--no-browser`, so
-signing in doesn't open a browser window. If there is a `Weir.lnk` shortcut in your Startup folder,
-Weir removes it so there is only one startup entry. Uninstalling removes both.
+Weir does not start with Windows until you say so. The first time Weir starts it asks "Start Weir when you sign
+in to Windows?"; a silent install (`--silent`) never asks and leaves it off. The **Start with Windows** tick in the
+tray menu shows the current choice and switches it at any time. When it is on, Weir has a `Weir` entry under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. That start passes `--no-browser`, so signing in doesn't open
+a browser window. If there is a `Weir.lnk` shortcut in your Startup folder, turning it on removes it so there is only
+one startup entry. An update keeps an entry that is there pointing at the new version, and never adds one.
+Uninstalling removes it.
 
 Uninstalling leaves the runtime data in `C:\ProgramData\Weir` in place.

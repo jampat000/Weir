@@ -89,9 +89,9 @@ public sealed class SuitePauseServiceTests : IDisposable
 
         Assert.True(repaused.State.Paused);
         Assert.Equal(3, repaused.Entries.Length);
-        Assert.StartsWith("Processing paused: Processing was paused until 2026-01-15 10:30 UTC by alice.", repaused.Entries[0], StringComparison.Ordinal);
+        Assert.StartsWith("Processing paused: alice paused processing until 2026-01-15 10:30 UTC.", repaused.Entries[0], StringComparison.Ordinal);
         Assert.StartsWith("Processing resumed: The pause ran out", repaused.Entries[1], StringComparison.Ordinal);
-        Assert.StartsWith("Processing paused: Processing was paused until 2026-01-15 11:45 UTC by bob.", repaused.Entries[2], StringComparison.Ordinal);
+        Assert.StartsWith("Processing paused: bob paused processing until 2026-01-15 11:45 UTC.", repaused.Entries[2], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class SuitePauseServiceTests : IDisposable
         Assert.Single(first.Entries);
         Assert.Single(same.Entries);
         Assert.Equal(2, longer.Entries.Length);
-        Assert.StartsWith("Processing paused: Processing was paused until 2026-01-15 12:00 UTC by alice.", longer.Entries[1], StringComparison.Ordinal);
+        Assert.StartsWith("Processing paused: alice paused processing until 2026-01-15 12:00 UTC.", longer.Entries[1], StringComparison.Ordinal);
     }
 
     [Fact]

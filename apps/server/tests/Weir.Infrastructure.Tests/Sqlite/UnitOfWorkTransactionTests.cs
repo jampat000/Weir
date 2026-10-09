@@ -55,7 +55,7 @@ public sealed class UnitOfWorkTransactionTests
             Assert.True(ForeignWriteSucceeds(db, "before-the-transaction"), "no transaction is open yet");
 
             // The job queue's enqueue takes the unit's transaction and reads before it inserts.
-            uow.WriteTransaction();
+            await uow.WriteTransactionAsync();
             Assert.Equal(1, await uow.CountAsync("SELECT count(*) FROM jobs"));
 
             // Nothing may commit between that read and the write it is about to become.
@@ -78,7 +78,7 @@ public sealed class UnitOfWorkTransactionTests
             // writer arrives in between. Whether it gets in (deferred) or is turned away (immediate) is
             // not what is under test and is deliberately not asserted here — what matters is that this
             // unit of work still completes either way.
-            uow.WriteTransaction();
+            await uow.WriteTransactionAsync();
             await uow.CountAsync("SELECT count(*) FROM jobs WHERE dedupe_key = 'mine'");
             ForeignWriteSucceeds(db, "someone-else");
 

@@ -229,7 +229,7 @@ public sealed class CleanedSourceRepeatTests : IDisposable
         var result = await _fixture.Db(uow => requeue.RequeueFileAsync(uow, row));
 
         Assert.Equal((0, 1, 1), (result.Requeued, result.Skipped, result.AlreadyCleaned));
-        Assert.StartsWith("Already done: cleaned on ", result.Detail, StringComparison.Ordinal);
+        Assert.StartsWith("Weir already cleaned this file, so it skipped it. Already done: cleaned on ", result.Detail, StringComparison.Ordinal);
         Assert.False(await _fixture.Db(uow => requeue.CanRequeueAsync(uow, row)));
         await AssertNothingWasProcessedAgainAsync();
         Assert.Single(Reports());

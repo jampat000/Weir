@@ -20,6 +20,7 @@ function sentenceCase(text: string): string {
 const STATUS_LABELS: Readonly<Record<string, string>> = {
   up_to_date: "Up to date",
   update_available: "Update ready",
+  rate_limited: "Limited by GitHub",
 };
 
 /** What a status pill says about the update check. */

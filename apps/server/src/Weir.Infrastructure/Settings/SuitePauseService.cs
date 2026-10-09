@@ -37,14 +37,14 @@ public sealed class SuitePauseService
     }
 
     /// <summary>
-    /// Pauses (for <paramref name="minutes"/>, or until resumed when none) or resumes, on behalf of <paramref name="by"/>. A
+    /// Pauses (for <paramref name="minutes"/>, or until resumed when none) or resumes. <paramref name="actor"/> is who did it, worded as the subject of the Activity sentence: a person's name, or "The tray". A
     /// request that says nothing about the length (<paramref name="keepEnd"/>) leaves a pause that is already running as it is,
     /// whatever else it changes; an explicit "no length" makes the pause last until it is resumed.
     /// </summary>
-    public async Task<PauseState> ChangeAsync(UnitOfWork uow, bool paused, long? minutes, bool keepEnd, bool scanWhilePaused, Timestamp now, string by)
+    public async Task<PauseState> ChangeAsync(UnitOfWork uow, bool paused, long? minutes, bool keepEnd, bool scanWhilePaused, Timestamp now, string actor)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        ArgumentException.ThrowIfNullOrWhiteSpace(by);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actor);
         var row = await _settings.EnsureAsync(uow).ConfigureAwait(false);
         var before = await LapseAsync(uow, row, now).ConfigureAwait(false);
         row = row with { ProcessingPaused = before.Paused, ProcessingPausedUntil = before.Paused ? before.PausedUntil : null };
@@ -58,11 +58,11 @@ public sealed class SuitePauseService
 
         if (after.Paused && (!before.Paused || before.PausedUntil?.AsUtc != after.PausedUntil?.AsUtc || before.ScanWhilePaused != after.ScanWhilePaused))
         {
-            await _activity.RecordAsync(uow, ActivityEventTypes.SystemProcessingPaused, "system", "Processing paused", PausedDetail(after, by)).ConfigureAwait(false);
+            await _activity.RecordAsync(uow, ActivityEventTypes.SystemProcessingPaused, "system", "Processing paused", PausedDetail(after, actor)).ConfigureAwait(false);
         }
         else if (!after.Paused && before.Paused)
         {
-            await _activity.RecordAsync(uow, ActivityEventTypes.SystemProcessingResumed, "system", "Processing resumed", $"Processing was resumed by {by}.").ConfigureAwait(false);
+            await _activity.RecordAsync(uow, ActivityEventTypes.SystemProcessingResumed, "system", "Processing resumed", $"{actor} resumed processing.").ConfigureAwait(false);
         }
 
         return after;
@@ -96,13 +96,13 @@ public sealed class SuitePauseService
         }
     }
 
-    private static string PausedDetail(PauseState state, string by)
+    private static string PausedDetail(PauseState state, string actor)
     {
-        var length = state.PausedUntil is { } until ? $"until {UtcText(until)}" : "until you resume";
+        var length = state.PausedUntil is { } until ? $"until {UtcText(until)}" : "until you resume it";
         var looking = state.ScanWhilePaused
             ? "Weir keeps looking for new files and starts nothing."
             : "Weir does not look for new files either.";
-        return $"Processing was paused {length} by {by}. {looking}";
+        return $"{actor} paused processing {length}. {looking}";
     }
 
     private static string UtcText(Timestamp? at) =>

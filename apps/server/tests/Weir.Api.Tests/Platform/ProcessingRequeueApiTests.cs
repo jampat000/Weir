@@ -1,11 +1,13 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using Weir.Core.Activity;
+using Weir.Infrastructure.Processing.RemuxPass;
 
 namespace Weir.Api.Tests.Platform;
 
 /// <summary>
 /// Queueing files again from Activity: the exact files a person chose, and a finished file only while its original is
-/// still in the watched folder.
+/// still in the watched folder. A file Weir already cleaned, unchanged or with its original gone, is skipped and Activity says so.
 /// </summary>
 public sealed class ProcessingRequeueApiTests
 {
@@ -64,6 +66,85 @@ public sealed class ProcessingRequeueApiTests
         var body = await RequeueAsync(client, fileId);
 
         Assert.Equal(1, body["requeued"]!.GetValue<int>());
+    }
+
+    /// <summary>A finished file as a pass leaves it: the original it cleaned, the fingerprint of that original, and the copy it handed back.</summary>
+    private static async Task<(long FileId, string Source)> SeedCleanedFileAsync(WeirTestServer server, long libraryId, string watched, string relativePath)
+    {
+        var source = Path.Join(watched, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+        await File.WriteAllTextAsync(source, "not really a film");
+        var output = Path.Join(server.Home, "output", relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+        await File.WriteAllTextAsync(output, "cleaned");
+        var fingerprint = SourceFiles.Fingerprint(source);
+        var fileId = await TestDatabase.ScalarAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, last_seen_at, processed_source_size, processed_source_mtime_ns) " +
+            "VALUES ($lib, $path, 'processed', CURRENT_TIMESTAMP, $size, $mtime) RETURNING id",
+            ("$lib", libraryId), ("$path", relativePath), ("$size", fingerprint.SizeBytes), ("$mtime", fingerprint.ModifiedTimeNs));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO handbacks (library_id, relative_path, output_path, output_size, output_mtime_ns, written_at) " +
+            "VALUES ($lib, $path, $output, 7, 0, CURRENT_TIMESTAMP)",
+            ("$lib", libraryId), ("$path", relativePath), ("$output", output));
+        return (fileId, source);
+    }
+
+    private static Task<long> ActivityCountAsync(WeirTestServer server, string eventType) =>
+        TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = $type", ("$type", eventType));
+
+    private static Task<long> RemuxJobCountAsync(WeirTestServer server) =>
+        TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE job_kind = 'processing.file.remux_pass.v1'");
+
+    [Fact]
+    public async Task A_cleaned_file_whose_original_has_not_changed_is_skipped_with_an_activity_entry_and_queues_nothing()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        var (client, libraryId, watched) = await SignInWithALibraryAsync(server);
+        var (fileId, _) = await SeedCleanedFileAsync(server, libraryId, watched, "Heat/heat.mkv");
+
+        var body = await RequeueAsync(client, fileId);
+
+        Assert.Equal((0, 1), (body["requeued"]!.GetValue<int>(), body["skipped"]!.GetValue<int>()));
+        Assert.StartsWith("Weir already cleaned this file, so it skipped it. Already done: cleaned on ", body["detail"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Equal(1, await ActivityCountAsync(server, ActivityEventTypes.ProcessingFileSkippedRepeat));
+        Assert.Equal(
+            "Skipped: already done (heat.mkv)",
+            await TestDatabase.ScalarStringAsync(server, "SELECT title FROM activity_events WHERE event_type = $type", ("$type", ActivityEventTypes.ProcessingFileSkippedRepeat)));
+        Assert.Equal(0, await RemuxJobCountAsync(server));
+        Assert.Equal("processed", await TestDatabase.ScalarStringAsync(server, "SELECT status FROM files WHERE id = $id", ("$id", fileId)));
+    }
+
+    [Fact]
+    public async Task A_cleaned_file_whose_original_is_gone_is_skipped_with_an_activity_entry_too()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        var (client, libraryId, watched) = await SignInWithALibraryAsync(server);
+        var (fileId, source) = await SeedCleanedFileAsync(server, libraryId, watched, "Heat/heat.mkv");
+        File.Delete(source);
+
+        var body = await RequeueAsync(client, fileId);
+
+        Assert.Equal((0, 1), (body["requeued"]!.GetValue<int>(), body["skipped"]!.GetValue<int>()));
+        Assert.StartsWith("Weir already cleaned this file, so it skipped it. Already done: cleaned on ", body["detail"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Equal(1, await ActivityCountAsync(server, ActivityEventTypes.ProcessingFileSkippedRepeat));
+        Assert.Equal(0, await RemuxJobCountAsync(server));
+    }
+
+    [Fact]
+    public async Task A_cleaned_file_whose_original_has_changed_is_queued_again_without_a_skip_entry()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        var (client, libraryId, watched) = await SignInWithALibraryAsync(server);
+        var (fileId, source) = await SeedCleanedFileAsync(server, libraryId, watched, "Heat/heat.mkv");
+        await File.WriteAllTextAsync(source, "an upgraded release, a different size");
+
+        var body = await RequeueAsync(client, fileId);
+
+        Assert.Equal(1, body["requeued"]!.GetValue<int>());
+        Assert.Equal(0, await ActivityCountAsync(server, ActivityEventTypes.ProcessingFileSkippedRepeat));
+        Assert.Equal(1, await RemuxJobCountAsync(server));
     }
 
     [Fact]

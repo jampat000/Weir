@@ -115,7 +115,7 @@ public sealed class PauseTests
         await scenario.SetPauseAsync(paused: false);
 
         var paused = Assert.Single(await scenario.ActivityAsync("system.processing_paused"));
-        Assert.Contains("paused until you resume", paused.ToJsonString(), StringComparison.Ordinal);
+        Assert.Contains("paused processing until you resume it", paused.ToJsonString(), StringComparison.Ordinal);
         Assert.Single(await scenario.ActivityAsync("system.processing_resumed"));
     }
 }
