@@ -15,10 +15,11 @@ public sealed class FakeFfmpeg : IDisposable
     private const string BuiltToolsFolderKey = "BuiltFakeToolsFolder";
     private const string ToolsProgram = "Weir.Contract.FakeTools";
 
-    private static readonly TimeSpan ScriptWriteTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan CallsReadTimeout = TimeSpan.FromSeconds(10);
 
     private readonly object _gate = new();
     private JsonObject _script = new();
+    private int _generation;
 
     private FakeFfmpeg(string folder) => Folder = folder;
 
@@ -136,7 +137,7 @@ public sealed class FakeFfmpeg : IDisposable
     private string[] ReadCallsFile()
     {
         var path = Path.Combine(Folder, FakeToolProtocol.CallsFile);
-        var deadline = DateTime.UtcNow + ScriptWriteTimeout;
+        var deadline = DateTime.UtcNow + CallsReadTimeout;
         while (true)
         {
             try
@@ -157,24 +158,10 @@ public sealed class FakeFfmpeg : IDisposable
         }
     }
 
-    // A tool reading the script at this moment keeps the swap from completing; try again until it lets go.
+    // Each version goes to a file of its own, so there is no file to swap and nothing a running tool can hold up.
     private void WriteScript()
     {
-        var path = Path.Combine(Folder, FakeToolProtocol.ScriptFile);
-        var temporary = path + ".tmp";
-        File.WriteAllText(temporary, _script.ToJsonString());
-        var deadline = DateTime.UtcNow + ScriptWriteTimeout;
-        while (true)
-        {
-            try
-            {
-                File.Move(temporary, path, overwrite: true);
-                return;
-            }
-            catch (IOException) when (DateTime.UtcNow < deadline)
-            {
-                Thread.Sleep(10);
-            }
-        }
+        _generation++;
+        File.WriteAllText(Path.Combine(Folder, FakeToolProtocol.ScriptFileName(_generation)), _script.ToJsonString());
     }
 }

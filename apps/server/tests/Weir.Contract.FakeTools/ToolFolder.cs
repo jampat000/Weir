@@ -21,18 +21,27 @@ internal sealed class ToolFolder(string path)
         return new ToolFolder(string.IsNullOrEmpty(configured) ? AppContext.BaseDirectory : configured);
     }
 
+    /// <summary>The newest script that reads whole; one still being written does not, and the one before it stands until it does.</summary>
     public JsonObject LoadScript()
     {
-        try
+        var newestFirst = Directory.EnumerateFiles(Path, FakeToolProtocol.ScriptSearchPattern)
+            .Select(file => FakeToolProtocol.TryGetScriptGeneration(System.IO.Path.GetFileName(file), out var generation) ? (File: file, Generation: generation) : default)
+            .Where(script => script.File is not null)
+            .OrderByDescending(script => script.Generation);
+        foreach (var (file, _) in newestFirst)
         {
-            using var stream = new FileStream(
-                System.IO.Path.Combine(Path, FakeToolProtocol.ScriptFile), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            return JsonNode.Parse(stream) as JsonObject ?? new JsonObject();
+            try
+            {
+                using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                return JsonNode.Parse(stream) as JsonObject ?? new JsonObject();
+            }
+            catch (Exception problem) when (problem is IOException or JsonException or UnauthorizedAccessException)
+            {
+                // Not complete yet: use the one before.
+            }
         }
-        catch (Exception problem) when (problem is IOException or JsonException or UnauthorizedAccessException)
-        {
-            return new JsonObject();
-        }
+
+        return new JsonObject();
     }
 
     public void LogCall(string tool, IReadOnlyList<string> argv, params (string Name, JsonNode Value)[] extra)
