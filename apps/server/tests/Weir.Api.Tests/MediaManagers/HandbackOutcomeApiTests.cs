@@ -344,6 +344,187 @@ public sealed class HandbackOutcomeApiTests : IDisposable
 
     private static async Task<string?> Code(HttpResponseMessage response) => (await Json(response))["code"]?.GetValue<string>();
 
+    /// <summary>
+    /// Makes the hand-off one of the release folder, with an extra beside the film: the file row and the target row the extra's
+    /// pass would have left.
+    /// </summary>
+    private static async Task AddExtraAsync(WeirTestServer server, string fileStatus, string targetResult, string reason, long extraMb = 15, long filmMb = 80)
+    {
+        await TestDatabase.ExecuteAsync(server, "UPDATE media_manager_handoffs SET relative_path = 'Film' WHERE handoff_id = 'h1'");
+        await TestDatabase.ExecuteAsync(server, "UPDATE files SET size_bytes = $size WHERE relative_path = 'Film/film.mkv'", ("$size", filmMb * 1024 * 1024));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO files (library_id, relative_path, status, status_reason, size_bytes, updated_at) " +
+            "VALUES ((SELECT id FROM libraries WHERE media_type = 'movie' ORDER BY id LIMIT 1), 'Film/Gallery.mkv', $status, $reason, $size, '2099-01-01 00:00:00.000000')",
+            ("$status", fileStatus),
+            ("$reason", reason),
+            ("$size", extraMb * 1024 * 1024));
+        await TestDatabase.ExecuteAsync(
+            server,
+            "INSERT INTO media_manager_handoff_targets (handoff_row_id, relative_path, result, message) " +
+            "VALUES ((SELECT id FROM media_manager_handoffs WHERE handoff_id = 'h1'), 'Film/Gallery.mkv', $result, $reason)",
+            ("$result", targetResult),
+            ("$reason", reason));
+    }
+
+    [Fact]
+    public async Task An_extra_the_workflows_rules_left_alone_does_not_fail_the_hand_off_so_the_import_settles_the_film()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await AddExtraAsync(server, "skipped", "skipped", "Skipped because this file is 15.6 MB, under the 50 MB minimum.");
+
+        using (var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h1", SecretHeader))
+        {
+            Assert.Equal("completed", (await Json(status))["state"]!.GetValue<string>());
+        }
+
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"released\":true", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.False(File.Exists(copy));
+        // The Activity entry is about the file that was delivered, not the folder or the extra beside it.
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE title = 'Deluno imported film.mkv'"));
+    }
+
+    private static async Task<string> HandoffStateAsync(WeirTestServer server)
+    {
+        using var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h1", SecretHeader);
+        return (await Json(status))["state"]!.GetValue<string>();
+    }
+
+    [Fact]
+    public async Task A_hand_off_an_earlier_release_recorded_failed_for_a_skipped_extra_settles_on_the_next_import_once_upgraded()
+    {
+        // As release candidate 8 left it: the extra's target is 'failed', the hand-off was reported failed, and the rule that
+        // refused "imported" for it is the one this build no longer applies once the migration has put the target right.
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await AddExtraAsync(server, "skipped", "failed", "Skipped because this file is 15.6 MB, under the 50 MB minimum.");
+        await TestDatabase.ExecuteAsync(server, "UPDATE media_manager_handoffs SET state = 'failed', reported_status = 'failed' WHERE handoff_id = 'h1'");
+        Assert.Equal("failed", await HandoffStateAsync(server));
+        using (var refused = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null)))
+        {
+            Assert.Equal((HttpStatusCode.Conflict, "handoff_ended"), (refused.StatusCode, await Code(refused)));
+        }
+
+        await TestDatabase.ExecuteAsync(server, MigrationScript);
+
+        Assert.Equal(("completed", "completed"), (
+            await TestDatabase.ScalarStringAsync(server, "SELECT reported_status FROM media_manager_handoffs WHERE handoff_id = 'h1'"),
+            await TestDatabase.ScalarStringAsync(server, "SELECT state FROM media_manager_handoffs WHERE handoff_id = 'h1'")));
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"released\":true", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.False(File.Exists(copy));
+    }
+
+    /// <summary>The upgrade's data migration for hand-offs recorded before a skipped file had a result of its own.</summary>
+    private static string MigrationScript
+    {
+        get
+        {
+            using var stream = typeof(Weir.Infrastructure.Sqlite.SchemaMigrator).Assembly
+                .GetManifestResourceStream("Weir.Infrastructure.Migrations.0041_handoff_skipped_extras.sql")!;
+            return new StreamReader(stream).ReadToEnd();
+        }
+    }
+
+    [Fact]
+    public async Task A_file_Weir_rejected_beside_a_delivered_one_fails_the_hand_off_even_though_its_status_is_skipped()
+    {
+        // A rejected release, an unreadable file or a file with no video is recorded with the same file status as an extra the
+        // workflow's rules left alone, but it is something a person must see.
+        await using var server = await StartAsync();
+        await FinishedHandoffAsync(server);
+        await AddExtraAsync(server, "skipped", "failed", "This file could not be read, so Weir left it alone.");
+
+        Assert.Equal("failed", await HandoffStateAsync(server));
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        Assert.Equal((HttpStatusCode.Conflict, "handoff_ended"), (response.StatusCode, await Code(response)));
+    }
+
+    [Fact]
+    public async Task A_skipped_file_that_is_not_smaller_than_the_delivered_one_might_be_the_film_so_the_hand_off_fails()
+    {
+        await using var server = await StartAsync();
+        await FinishedHandoffAsync(server);
+        await AddExtraAsync(
+            server, "skipped", "skipped", "Skipped because this file is 90.0 MB, under the 95 MB minimum.", extraMb: 90, filmMb: 80);
+
+        Assert.Equal("failed", await HandoffStateAsync(server));
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        Assert.Equal((HttpStatusCode.Conflict, "handoff_ended"), (response.StatusCode, await Code(response)));
+    }
+
+    [Fact]
+    public async Task A_skipped_file_whose_size_is_not_known_fails_the_hand_off()
+    {
+        await using var server = await StartAsync();
+        await FinishedHandoffAsync(server);
+        await AddExtraAsync(server, "skipped", "skipped", "Skipped because this file is 15.6 MB, under the 50 MB minimum.", extraMb: 0);
+
+        Assert.Equal("failed", await HandoffStateAsync(server));
+    }
+
+    [Fact]
+    public async Task An_import_repeated_after_a_retry_wrote_a_new_copy_records_the_new_copy()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        using (var first = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null)))
+        {
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        }
+
+        // A retry reports the hand-off again with a new copy; the handbacks row starts over, as a new copy always does.
+        await File.WriteAllTextAsync(copy, "the cleaned copy");
+        var info = new FileInfo(copy);
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE handbacks SET outcome = NULL, outcome_by = NULL, outcome_at = NULL, imported_path = NULL, released_at = NULL, settled_at = NULL, " +
+            "release_note = NULL, output_size = $size, output_mtime_ns = $mtime, written_at = '2026-09-21 10:00:00.000000'",
+            ("$size", info.Length),
+            ("$mtime", (info.LastWriteTimeUtc - DateTime.UnixEpoch).Ticks * 100));
+        await TestDatabase.ExecuteAsync(server, "UPDATE media_manager_handoff_targets SET output_written_at = '2026-09-21 10:00:00.000000'");
+
+        using var second = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Contains("\"released\":true", await second.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.False(File.Exists(copy));
+        Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM handbacks WHERE outcome = 'imported' AND released_at IS NOT NULL"));
+
+        // Once every copy has the manager's word, the same message again changes nothing.
+        using var third = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+        Assert.Equal(HttpStatusCode.OK, third.StatusCode);
+        Assert.Equal(2, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM activity_events WHERE event_type = 'processing.handback_outcome'"));
+    }
+
+    [Fact]
+    public async Task An_import_is_accepted_for_a_hand_off_that_ended_failed_once_Weir_handed_back_a_file()
+    {
+        await using var server = await StartAsync();
+        var copy = await FinishedHandoffAsync(server);
+        await AddExtraAsync(server, "processing_failed", "failed", "The extra could not be processed.");
+        await TestDatabase.ExecuteAsync(
+            server,
+            "UPDATE media_manager_handoffs SET state = 'failed', reported_status = 'failed', output_files_json = $files WHERE handoff_id = 'h1'",
+            ("$files", System.Text.Json.JsonSerializer.Serialize(new[] { copy })));
+
+        using (var status = await new ApiTestClient(server).GetAsync("/api/v1/intake/handoffs/deluno/h1", SecretHeader))
+        {
+            Assert.Equal("failed", (await Json(status))["state"]!.GetValue<string>());
+        }
+
+        using var response = await PostOutcomeAsync(server, "h1", DelunoOutcome("imported", "/media/movies/Film/film.mkv", null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"released\":true", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.False(File.Exists(copy));
+    }
+
     [Fact]
     public async Task Not_imported_records_the_reason_and_keeps_the_copy()
     {

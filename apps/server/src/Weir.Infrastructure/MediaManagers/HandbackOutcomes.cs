@@ -97,6 +97,7 @@ public sealed class HandbackOutcomes
         var afterAll = HandbackRules.Supersedes(row.Outcome, outcome);
         int removed = 0, gone = 0, kept = 0;
         string? firstKeptNote = null;
+        var named = new List<string>();
         if (row.LibraryId is { } libraryId)
         {
             var wasReported = await _targets.ReportedCopiesAsync(uow, row).ConfigureAwait(false);
@@ -108,6 +109,7 @@ public sealed class HandbackOutcomes
                     continue;
                 }
 
+                named.Add(copy.RelativePath);
                 await _handback.RecordOutcomeAsync(uow, copy.Id, outcome, manager, occurredAt, importedPath, reason).ConfigureAwait(false);
                 // Already settled (Cleanup removed it, Sonarr's own webhook got there first): keep what happened then. The one
                 // settling an import after all undoes is this manager's own "will not import".
@@ -157,9 +159,36 @@ public sealed class HandbackOutcomes
         var released = outcome == HandbackRules.Imported && removed > 0 && kept == 0;
         var message = HandbackRules.OutcomeMessage(manager, outcome, removed, gone, kept, firstKeptNote);
         await _ledger.RecordManagerOutcomeAsync(uow, row.Id, outcome, occurredAt, message, released).ConfigureAwait(false);
-        await RecordActivityAsync(uow, manager, outcome, row.LibraryId, row.RelativePath, importedPath, reason, released, message, "webhook", afterAll)
+        // A hand-off of one delivered file in a folder is about that file; the folder's name says nothing about which one it was.
+        var subject = named.Count == 1 ? named[0] : row.RelativePath;
+        await RecordActivityAsync(uow, manager, outcome, row.LibraryId, subject, importedPath, reason, released, message, "webhook", afterAll)
             .ConfigureAwait(false);
         return new HandoffOutcomeResult(released, message);
+    }
+
+    /// <summary>
+    /// Whether the hand-off's report named a copy the manager has said nothing about yet: a retry that finished after the manager
+    /// answered writes a new copy, and the answer already recorded is not about it.
+    /// </summary>
+    public async Task<bool> HasUnansweredCopyAsync(UnitOfWork uow, HandoffLedgerRow row)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        ArgumentNullException.ThrowIfNull(row);
+        if (row.LibraryId is not { } libraryId)
+        {
+            return false;
+        }
+
+        var wasReported = await _targets.ReportedCopiesAsync(uow, row).ConfigureAwait(false);
+        foreach (var file in await HandoffLedgerStore.FileRowsAsync(uow, row).ConfigureAwait(false))
+        {
+            if (await _handback.FindAsync(uow, libraryId, file.RelativePath).ConfigureAwait(false) is { Outcome: null } copy && wasReported(copy))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>The copy was kept by this manager's "will not import", the one settling an import after all undoes.</summary>
