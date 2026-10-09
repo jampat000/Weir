@@ -9,7 +9,7 @@ namespace Weir.Infrastructure.Runtime;
 
 /// <summary>
 /// Hears the Windows tray's side of the hand-off. The tray and the server talk through small files in Weir's data folder:
-/// the tray writes <see cref="UpdateFiles.StateFileName"/> once an update has downloaded, and rewrites
+/// the tray writes <see cref="UpdateFiles.StateFileName"/> at each step of an update (checking, downloading, downloaded, failed), and rewrites
 /// <see cref="LanAccessFile.FileName"/> after it has asked Windows for the firewall rule. When one of them is written, by
 /// the tray or by the server itself, the stream says the data it carries changed
 /// (<see cref="DataTopics.Update"/>, <see cref="DataTopics.NetworkAccess"/>), so System › About shows the tray's answer the

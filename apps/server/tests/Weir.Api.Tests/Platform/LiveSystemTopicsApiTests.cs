@@ -120,6 +120,24 @@ public sealed class LiveSystemTopicsApiTests
         Assert.Equal(("true", "9.9.9"), (state["downloaded"]!.ToString(), state["pending_version"]!.ToString()));
     }
 
+    [Theory]
+    [InlineData("checking", null)]
+    [InlineData("downloading", null)]
+    [InlineData("failed", "Weir could not reach GitHub to look for an update. Check the internet connection and try again.")]
+    public async Task Each_step_the_tray_takes_reaches_an_open_stream_as_an_update_change_and_shows_in_the_update_state(string step, string? failure)
+    {
+        var (server, client, stream) = await StartListeningAsync();
+        await using var _server = server;
+        using var _stream = stream;
+        var failureJson = failure is null ? "null" : $"\"{failure}\"";
+
+        await File.WriteAllTextAsync(Path.Join(server.Home, "update-state.json"), $"{{\"state\": \"{step}\", \"downloaded\": false, \"version\": null, \"failure\": {failureJson}}}");
+
+        await NextTopicNamedAsync(stream, DataTopics.Update);
+        var state = await Json(await client.GetAsync("/api/v1/suite/update-state"));
+        Assert.Equal((step, failure), (state["state"]!.ToString(), state["failure"]?.ToString()));
+    }
+
     [Fact]
     public async Task A_choice_saved_for_the_tray_reaches_an_open_stream_as_a_network_access_change()
     {

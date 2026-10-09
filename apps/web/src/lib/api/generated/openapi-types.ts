@@ -1895,6 +1895,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/suite/check-update": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Suite Check Update
+     * @description Ask the tray to check for an update now.
+     */
+    post: operations["post_suite_check_update_api_v1_suite_check_update_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/suite/download-update": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Suite Download Update
+     * @description Ask the tray to download the available update now, whatever the update mode.
+     */
+    post: operations["post_suite_download_update_api_v1_suite_download_update_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/suite/configuration-backups": {
     parameters: {
       query?: never;
@@ -2590,6 +2630,22 @@ export interface components {
      * @description Body for POST /suite/apply-update.
      */
     ApplyUpdateIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /**
+     * CheckUpdateIn
+     * @description Body for POST /suite/check-update.
+     */
+    CheckUpdateIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /**
+     * DownloadUpdateIn
+     * @description Body for POST /suite/download-update.
+     */
+    DownloadUpdateIn: {
       /** Csrf Token */
       csrf_token: string;
     };
@@ -8399,7 +8455,7 @@ export interface components {
     };
     /**
      * UpdateStateOut
-     * @description Current state of any downloaded-but-not-yet-applied update (read from update-state.json).
+     * @description Where the tray is with an update: idle (an update it found and did not download is named in pending_version), checking, downloading, downloaded (waiting to be applied) or failed (failure says why). Read from update-state.json.
      */
     UpdateStateOut: {
       /**
@@ -8407,8 +8463,16 @@ export interface components {
        * @default false
        */
       downloaded: boolean;
+      /** Failure */
+      failure?: string | null;
       /** Pending Version */
       pending_version?: string | null;
+      /**
+       * State
+       * @default idle
+       * @enum {string}
+       */
+      state: "idle" | "checking" | "downloading" | "downloaded" | "failed";
     };
     /** UserPublic */
     UserPublic: {
@@ -12116,6 +12180,72 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["ApplyUpdateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UpdateStateOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_suite_check_update_api_v1_suite_check_update_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckUpdateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UpdateStateOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_suite_download_update_api_v1_suite_download_update_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadUpdateIn"];
       };
     };
     responses: {

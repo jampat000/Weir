@@ -5,12 +5,17 @@ using Weir.Core.Updates;
 
 namespace Weir.Infrastructure.Runtime;
 
-/// <summary>The tray's update files under <c>WEIR_HOME</c>: settings, state, the apply-now flag and the work state.</summary>
+/// <summary>
+/// The tray's update files under <c>WEIR_HOME</c>: settings, the state the tray writes, the flags that ask it to check, download
+/// or apply now, and the work state.
+/// </summary>
 public sealed class UpdateFiles
 {
     public const string SettingsFileName = "update-settings.json";
     public const string StateFileName = "update-state.json";
     public const string ApplyFlagFileName = "update-apply-now";
+    public const string CheckFlagFileName = "update-check-now";
+    public const string DownloadFlagFileName = "update-download-now";
 
     /// <summary>What the tray reads to learn whether Weir is idle; written only while an update waits to install (#875).</summary>
     public const string WorkStateFileName = "work-state.json";
@@ -72,8 +77,29 @@ public sealed class UpdateFiles
         return UpdateStatus.UpdateSettingsOut(mode, checkOnStartup, checkIntervalMinutes);
     }
 
-    /// <summary>Read the update state the tray writes; a missing or unreadable file reads as the default state.</summary>
+    /// <summary>
+    /// Read the update state the tray writes; a missing or unreadable file reads as the default state. A check or download that
+    /// was asked for and not yet taken up by the tray reads as under way, so the person sees their click at once.
+    /// </summary>
     public WireObject ReadState()
+    {
+        var written = ReadStateFile();
+        if (written.Get("state") is not WireString { Value: UpdateStatus.StateIdle or UpdateStatus.StateFailed })
+        {
+            return written;
+        }
+
+        if (File.Exists(Path.Join(_options.WeirHome, CheckFlagFileName)))
+        {
+            return UpdateStatus.WithRequestedStep(written, UpdateStatus.StateChecking);
+        }
+
+        return File.Exists(Path.Join(_options.WeirHome, DownloadFlagFileName))
+            ? UpdateStatus.WithRequestedStep(written, UpdateStatus.StateDownloading)
+            : written;
+    }
+
+    private WireObject ReadStateFile()
     {
         var path = Path.Join(_options.WeirHome, StateFileName);
         if (!File.Exists(path))
@@ -91,10 +117,19 @@ public sealed class UpdateFiles
         }
     }
 
-    /// <summary>Create the apply-now flag file, or refresh its modified time when it already exists.</summary>
-    public void WriteApplyFlag()
+    /// <summary>Ask the tray to restart and install the downloaded update.</summary>
+    public void WriteApplyFlag() => WriteFlag(ApplyFlagFileName);
+
+    /// <summary>Ask the tray to look for an update now.</summary>
+    public void WriteCheckFlag() => WriteFlag(CheckFlagFileName);
+
+    /// <summary>Ask the tray to download the available update now.</summary>
+    public void WriteDownloadFlag() => WriteFlag(DownloadFlagFileName);
+
+    /// <summary>Create a flag file, or refresh its modified time when it already exists.</summary>
+    private void WriteFlag(string fileName)
     {
-        var path = Path.Join(_options.WeirHome, ApplyFlagFileName);
+        var path = Path.Join(_options.WeirHome, fileName);
         if (File.Exists(path))
         {
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
