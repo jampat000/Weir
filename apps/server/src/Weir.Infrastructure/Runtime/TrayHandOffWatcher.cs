@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -85,10 +86,10 @@ public sealed class TrayHandOffWatcher : BackgroundService
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                 InternalBufferSize = 16 * 1024,
             };
-            watcher.Created += (_, change) => Written(change.Name);
-            watcher.Changed += (_, change) => Written(change.Name);
-            watcher.Deleted += (_, change) => Written(change.Name);
-            watcher.Renamed += (_, change) => Written(change.Name);
+            watcher.Created += (_, change) => Hear(change.Name);
+            watcher.Changed += (_, change) => Hear(change.Name);
+            watcher.Deleted += (_, change) => Hear(change.Name);
+            watcher.Renamed += (_, change) => Hear(change.Name);
 
             // Events lost to a full buffer could have been any of the files, so every topic is announced.
             watcher.Error += (_, _) => _written.Writer.TryWrite(string.Empty);
@@ -102,7 +103,8 @@ public sealed class TrayHandOffWatcher : BackgroundService
         }
     }
 
-    private void Written(string? fileName)
+    /// <summary>Takes note that <paramref name="fileName"/> was written; the watcher's own events arrive here, and a test may call it directly.</summary>
+    internal void Hear(string? fileName)
     {
         if (fileName is not null && TopicByFile.ContainsKey(fileName))
         {
@@ -130,7 +132,7 @@ public sealed class TrayHandOffWatcher : BackgroundService
     /// <summary>Gathers what is written until the folder has been quiet for the settle time, or the most-waited time has passed.</summary>
     private async Task SettleAsync(HashSet<string> heard, CancellationToken stoppingToken)
     {
-        var started = Environment.TickCount64;
+        var started = Stopwatch.GetTimestamp();
         bool written;
         do
         {
@@ -142,7 +144,7 @@ public sealed class TrayHandOffWatcher : BackgroundService
                 written = true;
             }
         }
-        while (written && TimeSpan.FromMilliseconds(Environment.TickCount64 - started) < MostWaited);
+        while (written && Stopwatch.GetElapsedTime(started) < MostWaited);
     }
 
     private static IEnumerable<string> TopicsFor(HashSet<string> files) =>
