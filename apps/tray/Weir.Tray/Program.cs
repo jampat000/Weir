@@ -55,6 +55,14 @@ static class Program
             return 0;
         }
 
+        // A start that follows Setup (RestartAfterSetup) is for a Weir that Setup stopped; when Setup has started one itself
+        // there is nothing to do.
+        if (RestartAfterSetup.ShouldStepAside(args, () => InstallProcesses.AnotherTrayRuns(InstallProcesses.Root(), TrayLog.Write, "Start after Setup")))
+        {
+            TrayLog.Write("Start after Setup: Weir is already running, so this start has nothing to do.");
+            return 0;
+        }
+
         using var mutex = new Mutex(false, MutexName, out bool createdNew);
         if (!createdNew)
         {
@@ -65,8 +73,18 @@ static class Program
         // Listening from here, not from when the icon exists: a second launch while this one asks for a port or installs
         // an update is told about, not dropped.
         using var secondLaunch = new SecondLaunchSignal();
+        MarkRunning();
         LogUnhandledErrors();
         return RunTray(args, secondLaunch);
+    }
+
+    // Left behind only when something other than an orderly exit ends this tray (Setup stops it first, before any hook of
+    // the new version runs), which is what lets the after-install hook know Weir was running (RestartAfterSetup).
+    private static void MarkRunning()
+    {
+        var mark = TrayRunningMark.ForThisUser();
+        mark.Set(Environment.ProcessId);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => mark.Clear(Environment.ProcessId);
     }
 
     // Velopack runs Weir.exe with its own arguments to install, update and uninstall; these hooks run then and
@@ -84,6 +102,12 @@ static class Program
             {
                 TrayLog.Write($"Velopack: after install v{v}");
                 KillRunningProcesses($"Velopack after install v{v}");
+                RestartAfterSetup.Schedule(
+                    TrayRunningMark.ForThisUser(),
+                    Environment.ProcessPath ?? Path.Combine(InstallProcesses.Root(), "Weir.exe"),
+                    ParentProcess.Id,
+                    info => Process.Start(info)?.Dispose(),
+                    TrayLog.Write);
             })
             .OnBeforeUninstallFastCallback((v) =>
             {

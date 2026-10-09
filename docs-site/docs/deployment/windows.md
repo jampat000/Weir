@@ -182,6 +182,11 @@ non-zero on failure.** Nothing here waits on Weir itself, so there is no risk of
 long-running app. `--installto <dir>` overrides the install directory if you need one other than the
 per-user default (`%LocalAppData%\Weir`).
 
+Setup stops a Weir that is running before it installs. When Weir was running, a silent install starts
+it again once Setup has exited, on the same port and with no browser window, so an update never
+leaves it stopped; when it was not running, it stays stopped. A program that starts Weir itself
+afterwards, as below, is still right: that second start does nothing.
+
 Weir is a foreground desktop app, not a Windows service (see "How it runs" above): once started it
 keeps running, the same as it does for a person at a desktop. After a silent install, start it
 explicitly and treat it as up once its own health endpoint answers — not once the process exits, it

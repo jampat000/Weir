@@ -363,7 +363,7 @@ Weir-win-Setup.exe --silent
 ```
 
 Exits 0 on success, non-zero on failure, within seconds — `--silent` also skips Velopack's
-post-install app launch, so nothing here waits on Weir itself. Start Weir explicitly afterward, and
+post-install app launch, so nothing here waits on Weir itself. After a first install, start Weir explicitly, and
 watch for it becoming ready rather than for the process to exit — it is a foreground app that keeps
 running once started, exactly like a person's own copy:
 
@@ -376,6 +376,14 @@ tab — regardless of whether the session looks interactive. Poll `GET http://12
 until it answers `{"ready": true}` (a healthy start typically takes a few seconds; 60 seconds is a
 generous timeout). An early exit means the start failed; its exit code is non-zero and
 `tray-host.log` under the runtime home (`C:\ProgramData\Weir` by default) says why.
+
+**Over a running Weir (#942).** Setup stops the running Weir, tray and server, before it runs any hook, and starts the new Weir itself only when it is not silent. So a silent Setup over a running Weir would leave it stopped. To prevent that, a Setup `--silent` over a Weir that was running starts Weir again, and one over a Weir that was not running leaves it stopped:
+
+- **Knowing it was running.** The tray sets a mark, the volatile registry key `HKCU\SOFTWARE\WeirTrayRunning`, when it starts, and clears it when it exits in order (Quit, an update, the end of the Windows session). Setup ends the tray without that, so a mark still there when the new version's after-install hook runs means Weir was running. A restart or a sign-out removes the key, so a Weir that was off before the PC restarted is never mistaken for a running one. A tray that crashed also leaves the mark, so a silent Setup after a crash starts Weir.
+- **Starting it.** The hook cannot start the tray itself, because Setup stops everything running from the install folder again as soon as the hook ends. It starts a PowerShell from System32 instead. That PowerShell waits for Setup to exit and then starts `Weir.exe --no-browser --after-setup`: the saved port and data folder, no browser and no balloon, as at sign-in.
+- **A plain Setup keeps Velopack's own start.** Velopack has already started Weir by the time Setup exits, and a start carrying `--after-setup` does nothing when a tray from this install is running.
+
+`tray-host.log` says which happened: `Weir was running before this install. It starts again once Setup ...`, `Weir was not running before this install, so it is left stopped.` or `Start after Setup: Weir is already running, so this start has nothing to do.` A caller that starts Weir itself after Setup, as above, stays right: that second start does nothing.
 
 **Don't wait on the process tree.** Weir keeps running after Setup exits — that is correct, not a
 hang — so a caller must wait for Setup's own exit (or, for the second command above, for `/ready` or
