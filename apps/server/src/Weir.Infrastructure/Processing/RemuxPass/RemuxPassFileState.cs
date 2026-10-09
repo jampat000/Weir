@@ -39,7 +39,7 @@ public static class RemuxPassFileState
     }
 
     /// <summary>Moves a file Weir has already seen into a new state. False when there is no row.</summary>
-    public static async Task<bool> MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason, DateTimeOffset now)
+    public static async Task<bool> MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason, DateTimeOffset now, string? skipKind = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var row = await FindAsync(uow, libraryId, relativePath).ConfigureAwait(false);
@@ -48,7 +48,7 @@ public static class RemuxPassFileState
             return false;
         }
 
-        var sets = new List<string> { "status = $status", "status_reason = $reason", "updated_at = CURRENT_TIMESTAMP" };
+        var sets = new List<string> { "status = $status", "status_reason = $reason", "skip_kind = $skip_kind", "updated_at = CURRENT_TIMESTAMP" };
         if (status is ProcessingFileStatuses.Processing or ProcessingFileStatuses.Processed or ProcessingFileStatuses.ProcessingFailed)
         {
             sets.Add("last_attempt_at = $now");
@@ -68,6 +68,7 @@ public static class RemuxPassFileState
             $"UPDATE files SET {string.Join(", ", sets)} WHERE id = $id",
             ("$status", status),
             ("$reason", reason),
+            ("$skip_kind", skipKind),
             ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
         return true;

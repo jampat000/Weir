@@ -53,7 +53,7 @@ internal sealed record WatchedFolderScanLookups(
 }
 
 /// <summary>A rejected file this library is set to delete, removed only after its decision is recorded.</summary>
-internal sealed record RejectedFileRemoval(string RelativePath, string FilePath, string Reason, string Action);
+internal sealed record RejectedFileRemoval(string RelativePath, string FilePath, string Reason, string Action, string? SkipKind);
 
 /// <summary>What a scan does about one file.</summary>
 internal sealed record WatchedFileDecision

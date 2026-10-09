@@ -69,36 +69,35 @@ function rejectionSentence(detail: ActivityDetail): string {
   });
 }
 
-/** What became of a finished pass, most telling first: a rejection is a decision, so it never reads as a failure. */
+/**
+ * What became of a finished pass, most telling first: a rejection is a decision, so it never reads as a failure. A pass that
+ * neither wrote an output nor checked that none was needed (a skip, a wait for the file, a file that was gone) finished
+ * nothing, and is null whatever its reason.
+ */
 function finishedKind(outcome: {
   passed: boolean;
   rejected: boolean;
   failed: boolean;
   already: boolean;
-}): FinishedKind {
+  written: boolean;
+}): FinishedKind | null {
   if (outcome.passed) return "passed";
   if (outcome.rejected) return "rejected";
   if (outcome.failed) return "failed";
-  return outcome.already ? "already" : "cleaned";
+  if (outcome.already) return "already";
+  return outcome.written ? "cleaned" : null;
 }
 
 function count(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
 
-/** The guardrail that skips a file under the workflow's minimum size (`RemuxPassRunner.InputGuardrails`). */
-const MINIMUM_SIZE_GUARDRAIL = "minimum_input_file_size";
-
-/**
- * The finished file an Activity entry describes, or null for any other kind of entry. A file the workflow's minimum size
- * left alone is none: nothing was written or handed back for it.
- */
+/** The finished file an Activity entry describes, or null for any other kind of entry, and for a pass that finished nothing. */
 export function finishedFileFromEvent(
   ev: ActivityEventItem,
 ): FinishedFile | null {
   const detail = parseActivityDetail(ev.detail);
   if (ev.event_type === REMUX_PASS_COMPLETED_EVENT) {
-    if (asString(detail?.guardrail) === MINIMUM_SIZE_GUARDRAIL) return null;
     const outcome = asString(detail?.outcome) ?? "";
     const passed = detail?.pass_through_unchanged === true;
     const rejected = isRejectedByRules(detail);
@@ -106,12 +105,20 @@ export function finishedFileFromEvent(
     const already =
       outcome === "live_skipped_not_required" ||
       detail?.remux_required === false;
+    const kind = finishedKind({
+      passed,
+      rejected,
+      failed,
+      already,
+      written: outcome === "live_output_written",
+    });
+    if (kind === null) return null;
     const source = asNumber(detail?.source_size_bytes);
     const output = asNumber(detail?.output_size_bytes);
     return {
       id: ev.id,
       source: "download",
-      kind: finishedKind({ passed, rejected, failed, already }),
+      kind,
       relativePath:
         asString(detail?.relative_media_path) ??
         ev.relative_path ??

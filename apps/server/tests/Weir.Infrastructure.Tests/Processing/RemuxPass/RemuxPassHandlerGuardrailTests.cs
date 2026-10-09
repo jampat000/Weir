@@ -88,6 +88,7 @@ public sealed partial class RemuxPassHandlerTests
 
         Assert.Equal(ProcessingFileStatuses.Skipped, await ScalarText("SELECT status FROM files"));
         Assert.StartsWith("Skipped because this file is 0.0 MB, under the 1 MB minimum.", await ScalarText("SELECT status_reason FROM files"), StringComparison.Ordinal);
+        Assert.Equal(SkipKinds.BelowMinimumSize, await ScalarText("SELECT skip_kind FROM files"));
         Assert.False(File.Exists(_folders.Out("Movie/file.mkv")));
     }
 }

@@ -5430,6 +5430,18 @@
             "description": "When this file's size last changed, as observed across scans.",
             "title": "Size Changed At"
           },
+          "skip_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why a skipped file was skipped, as a code: below_minimum_size is the workflow's minimum size doing its job. Null for any other skip, and for a file that is not skipped.",
+            "title": "Skip Kind"
+          },
           "status": {
             "enum": [
               "unprocessed",

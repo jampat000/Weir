@@ -266,13 +266,25 @@ describe("the files that wait on a person", () => {
   });
 
   it("leave out a file under the workflow's minimum size, which is the minimum doing its job", () => {
-    const extra = skippedBy(
-      "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
-    );
+    const extra = file({
+      status: "skipped",
+      status_reason: "Skipped because Weir leaves small files alone.",
+      skip_kind: "below_minimum_size",
+    });
 
     expect(waitsOnAPerson(extra)).toBe(false);
     expect(inGroup(downloadEntry(extra), "attention")).toBe(false);
     expect(entryMeaning(downloadEntry(extra))).toBe("idle");
+  });
+
+  it("go by the skip's code, never its sentence", () => {
+    expect(
+      waitsOnAPerson(
+        skippedBy(
+          "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("keep every other rule's skip, whatever its size or date", () => {

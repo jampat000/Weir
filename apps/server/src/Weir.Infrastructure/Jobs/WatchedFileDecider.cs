@@ -211,11 +211,11 @@ internal sealed class WatchedFileDecider
         RejectedFileRemoval? removal = null;
         if (_scan.Rules.RejectedFileAction == "delete_file" && !_scan.Links.KeepsOriginals)
         {
-            removal = new RejectedFileRemoval(write.RelativePath, filePath, reason, _scan.Rules.RejectedFileAction);
+            removal = new RejectedFileRemoval(write.RelativePath, filePath, reason, _scan.Rules.RejectedFileAction, rejection.SkipKind);
             reason = $"{reason} This workflow is set to delete rejected files; Weir will record this decision before removing only this file.";
         }
 
-        return decision with { Write = write with { Verdict = new FileStateVerdict(ProcessingFileStatuses.Skipped, reason) }, Removal = removal };
+        return decision with { Write = write with { Verdict = new FileStateVerdict(ProcessingFileStatuses.Skipped, reason, SkipKind: rejection.SkipKind) }, Removal = removal };
     }
 
     private string? AccessProblem(string filePath) =>

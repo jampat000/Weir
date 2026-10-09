@@ -106,6 +106,16 @@ public static class ProcessingFileMeanings
         OfStatus.TryGetValue(status, out var meaning) ? (int)meaning : Enum.GetValues<ProcessingFileMeaning>().Length;
 }
 
+/// <summary>
+/// Why a skipped file was skipped, as a code the server and the web app can act on without reading the sentence. The sentence in
+/// <c>status_reason</c> is for display only. Meaningful only while a file's status is <see cref="ProcessingFileStatuses.Skipped"/>.
+/// </summary>
+public static class SkipKinds
+{
+    /// <summary>The file is smaller than the workflow's minimum size: the minimum doing its job, which skips samples and extras.</summary>
+    public const string BelowMinimumSize = "below_minimum_size";
+}
+
 /// <summary>What a cancelled file says on the Files screen (#643).</summary>
 public static class CancelledFileReasons
 {
@@ -139,6 +149,10 @@ public sealed record ProcessingFileRecord
     public Timestamp? SizeChangedAt { get; init; }
     public Timestamp? HoldUntil { get; init; }
     public string? FailureClass { get; init; }
+
+    /// <summary>Why the file was skipped (<see cref="SkipKinds"/>), when its status is skipped and the reason has a code; null for any other skip.</summary>
+    public string? SkipKind { get; init; }
+
     public long FailureAttempts { get; init; }
     public Timestamp? NextRetryAt { get; init; }
 

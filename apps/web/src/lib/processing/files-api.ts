@@ -24,17 +24,14 @@ const PROCESSING_FILE_STATUS_LABELS: Record<ProcessingFileStatus, string> = {
 /** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */
 export const REJECTED_BY_RULES = "rules";
 
-/** How the server words a skip for a file under the workflow's minimum size (`LibraryAdmission.BelowMinimumSizeReason`). */
-const BELOW_MINIMUM_SIZE =
-  /^skipped because this file is [\d.]+ MB, under the \d+ MB minimum/i;
+/** The code the server records for a skip under the workflow's minimum size (`SkipKinds.BelowMinimumSize`). */
+const BELOW_MINIMUM_SIZE = "below_minimum_size";
 
 /** Whether the workflow's minimum size left the file alone: that is the minimum doing its job, and needs nobody. */
 export function isBelowMinimumSize(
-  file: Pick<ProcessingFile, "status" | "status_reason">,
+  file: Pick<ProcessingFile, "status" | "skip_kind">,
 ): boolean {
-  return (
-    file.status === "skipped" && BELOW_MINIMUM_SIZE.test(file.status_reason)
-  );
+  return file.status === "skipped" && file.skip_kind === BELOW_MINIMUM_SIZE;
 }
 
 /**
@@ -42,7 +39,7 @@ export function isBelowMinimumSize(
  * under the minimum size is "Left alone".
  */
 export function processingFileStatusLabel(
-  file: Pick<ProcessingFile, "status" | "failure_class" | "status_reason">,
+  file: Pick<ProcessingFile, "status" | "failure_class" | "skip_kind">,
 ): string {
   if (file.status === "rejected" && file.failure_class === REJECTED_BY_RULES) {
     return "Rejected";
@@ -53,7 +50,10 @@ export function processingFileStatusLabel(
 
 /** The state and its reason as one lead. A reason that already opens with the state's word ("Rejected: …") stands alone. */
 export function processingFileLead(
-  file: Pick<ProcessingFile, "status" | "failure_class" | "status_reason">,
+  file: Pick<
+    ProcessingFile,
+    "status" | "failure_class" | "status_reason" | "skip_kind"
+  >,
 ): string {
   const label = processingFileStatusLabel(file);
   if (!file.status_reason) return label;
@@ -108,6 +108,8 @@ export interface ProcessingFile {
   blocked_by_connection: string | null;
   size_bytes: number;
   failure_class: string | null;
+  /** Why a skipped file was skipped, as a code (`below_minimum_size`); null for any other skip, and for a file not skipped. */
+  skip_kind?: string | null;
   failure_attempts: number;
   next_retry_at: string | null;
   /** The collision policy in force and what it decided, kept on the file rather than only in an activity note. */

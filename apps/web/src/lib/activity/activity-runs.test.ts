@@ -39,6 +39,21 @@ describe("activity runs", () => {
     expect(summary.failed).toBe(1);
   });
 
+  it("counts a pass that skipped its file as skipped, not processed", () => {
+    const summary = summarizeRun([
+      ev({
+        id: 2,
+        relative_path: "a.mkv",
+        result: "skipped",
+        detail: '{"outcome":"skipped_guardrail"}',
+      }),
+      ev({ id: 1, relative_path: "b.mkv", detail: '{"outcome":"ok"}' }),
+    ]);
+
+    expect(summary.headline).toContain("1 skipped");
+    expect(summary.headline).toContain("1 processed");
+  });
+
   it("falls back to entry counts when no file is named", () => {
     expect(
       summarizeRun([

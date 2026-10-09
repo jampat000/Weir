@@ -76,19 +76,42 @@ describe("finishedFileFromEvent for a pass that ended in a rejection", () => {
   });
 });
 
-describe("finishedFileFromEvent for a pass that skipped a file", () => {
-  it("is no finished file when the workflow's minimum size left it alone: nothing was handed back", () => {
+describe("finishedFileFromEvent for a pass that finished nothing", () => {
+  it.each([
+    [
+      "a file under the workflow's minimum size",
+      {
+        outcome: "skipped_guardrail",
+        guardrail: "minimum_input_file_size",
+        skip_kind: "below_minimum_size",
+      },
+    ],
+    [
+      "a file a safety check skipped for its age",
+      { outcome: "skipped_guardrail", guardrail: "minimum_file_age" },
+    ],
+    ["a file that was not ready yet", { outcome: "source_not_ready" }],
+    ["a file that was gone", { outcome: "source_gone" }],
+  ])(
+    "is no finished file for %s: nothing was written or checked",
+    (_, detail) => {
+      expect(
+        finishedFileFromEvent(passEvent({ ok: true, ...detail })),
+      ).toBeNull();
+    },
+  );
+
+  it("is cleaned only when the pass wrote an output, and already clean when it checked that none was needed", () => {
     expect(
       finishedFileFromEvent(
-        passEvent({
-          ok: true,
-          outcome: "skipped_guardrail",
-          guardrail: "minimum_input_file_size",
-          reason:
-            "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
-        }),
-      ),
-    ).toBeNull();
+        passEvent({ ok: true, outcome: "live_output_written" }),
+      )?.kind,
+    ).toBe("cleaned");
+    expect(
+      finishedFileFromEvent(
+        passEvent({ ok: true, outcome: "live_skipped_not_required" }),
+      )?.kind,
+    ).toBe("already");
   });
 });
 

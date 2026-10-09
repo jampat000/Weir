@@ -4934,6 +4934,11 @@ export interface components {
        */
       size_changed_at?: string | null;
       /**
+       * Skip Kind
+       * @description Why a skipped file was skipped, as a code: below_minimum_size is the workflow's minimum size doing its job. Null for any other skip, and for a file that is not skipped.
+       */
+      skip_kind?: string | null;
+      /**
        * Status
        * @enum {string}
        */

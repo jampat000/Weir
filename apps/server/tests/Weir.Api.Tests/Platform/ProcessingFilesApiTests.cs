@@ -230,6 +230,26 @@ public sealed class ProcessingFilesApiTests
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE dedupe_key = $dedupe", ("$dedupe", dedupeKey)));
     }
 
+    [Fact]
+    public async Task A_file_skipped_under_the_minimum_size_says_so_with_a_code_and_any_other_skip_has_none()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Film/Gallery.mkv", "skipped");
+        await SeedFileAsync(server, libraryId, "Film/Huge.mkv", "skipped");
+        await TestDatabase.ExecuteAsync(server, "UPDATE files SET skip_kind = 'below_minimum_size' WHERE relative_path = 'Film/Gallery.mkv'");
+
+        using var response = await client.GetAsync("/api/v1/processing/files?file_status=skipped");
+
+        var kinds = (await ApiTestClient.Json(response))!["files"]!.AsArray()
+            .ToDictionary(file => file!["relative_path"]!.GetValue<string>(), file => file!["skip_kind"]?.GetValue<string>());
+        Assert.Equal("below_minimum_size", kinds["Film/Gallery.mkv"]);
+        Assert.Null(kinds["Film/Huge.mkv"]);
+    }
+
     private static async Task RecordPassAsync(WeirTestServer server, long libraryId, string relativePath, string title, bool ok)
     {
         var writer = server.Services.GetRequiredService<IActivityWriter>();

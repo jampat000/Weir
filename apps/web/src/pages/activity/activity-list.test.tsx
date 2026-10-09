@@ -94,6 +94,7 @@ it("says a file the workflow's minimum size skipped was left alone, and any othe
     ...download,
     id: 4,
     status: "skipped",
+    skip_kind: "below_minimum_size",
     status_reason:
       "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
   } as ProcessingFile;

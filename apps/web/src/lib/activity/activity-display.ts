@@ -11,7 +11,7 @@ import {
   REMUX_PASS_COMPLETED_EVENT,
   SKIPPED_REPEAT_EVENT,
 } from "./event-types";
-import { isRejectedByRules } from "./pass-detail";
+import { finishedNothing, isRejectedByRules } from "./pass-detail";
 import type { StatusMeaning } from "../ui/status-meaning";
 
 export type ActivityDisplay = {
@@ -85,6 +85,16 @@ function progressDisplay(ev: ActivityEventItem): ActivityDisplay {
 function passDisplay(ev: ActivityEventItem): ActivityDisplay {
   const parsed = parseActivityDetail(ev.detail);
   const outcome = asString(parsed?.outcome);
+  if (finishedNothing(outcome)) {
+    return {
+      title: ev.title,
+      summary: asString(parsed?.reason) ?? "Weir did not process this file",
+      detail: ev.detail ?? null,
+      chip: outcome === "source_not_ready" ? "Waiting" : "Skipped",
+      meaning: "idle",
+      compact: false,
+    };
+  }
   const remuxNeeded = asBoolean(parsed?.remux_required);
   const passedThrough = asBoolean(parsed?.pass_through_unchanged) === true;
   const noChanges = outcome === "live_skipped_not_required";

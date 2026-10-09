@@ -151,6 +151,7 @@ describe("the Needs you panel when nothing needs a person", () => {
         relative_path: "Nosferatu.1922/Gallery.mkv",
         status: "skipped",
         failure_class: null,
+        skip_kind: "below_minimum_size",
         status_reason:
           "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
       }),

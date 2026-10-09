@@ -345,6 +345,7 @@ describe("the files that need a person", () => {
       status: "skipped",
       status_reason:
         "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+      skip_kind: "below_minimum_size",
     });
     const tooBig = failedFile(2, {
       status: "skipped",

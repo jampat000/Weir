@@ -89,7 +89,7 @@ internal sealed class WatchedFolderScanRun
             var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                await _files.MarkFileStatusAsync(uow, _scan.Library.Id, removal.RelativePath, ProcessingFileStatuses.Skipped, $"{removal.Reason} {detail}")
+                await _files.MarkFileStatusAsync(uow, _scan.Library.Id, removal.RelativePath, ProcessingFileStatuses.Skipped, $"{removal.Reason} {detail}", removal.SkipKind)
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
             }

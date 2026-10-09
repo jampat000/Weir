@@ -63,6 +63,8 @@ export function useRecentWork(now: number): RecentWork | undefined {
     const finished = passes.items
       .map(finishedFileFromEvent)
       .filter((file): file is FinishedFile => file !== null);
-    return recentWorkOf(finished, passes.total, cleans.total);
+    // A pass that finished nothing (a skip) is in the server's count but not among the finished files fetched.
+    const finishedNothing = passes.items.length - finished.length;
+    return recentWorkOf(finished, passes.total - finishedNothing, cleans.total);
   }, [passes, cleans]);
 }
