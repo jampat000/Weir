@@ -80,6 +80,19 @@ public sealed class WeirOpenerTests : IDisposable
     }
 
     [Fact]
+    public void The_already_running_balloon_gives_the_address_and_a_click_opens_Weir()
+    {
+        Opener().ShowAlreadyRunning();
+
+        var balloon = Assert.Single(_balloons);
+        Assert.Equal("Weir is already running at http://localhost:9400. Click to open it.", balloon.Text);
+        Assert.Equal(ToolTipIcon.Info, balloon.Icon);
+        Assert.Empty(_browser);
+        balloon.Click!();
+        Assert.Equal([(9400, "/")], _browser);
+    }
+
+    [Fact]
     public void While_the_server_starts_a_click_says_so_and_opens_nothing()
     {
         _phase = ServerPhase.Starting;

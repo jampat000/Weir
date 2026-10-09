@@ -430,7 +430,7 @@ sealed class TrayApp : IDisposable
     private void ShowAlreadyRunning()
     {
         TrayLog.Write("Weir was started again; telling the person it is already running.");
-        ShowBalloon("Weir", TrayBalloons.AlreadyRunningText(_server.Port), ToolTipIcon.Info);
+        _opener.ShowAlreadyRunning();
     }
 
     // The notices that point to tray-host.log show that file, selected.

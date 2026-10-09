@@ -23,8 +23,8 @@ static class TrayBalloons
     /// <summary>Weir has started, and the person started it. A click opens it.</summary>
     internal static string RunningText(int port) => $"Weir is running at {TrayState.AddressFor(port)}. Click to open it.";
 
-    /// <summary>Weir was started again while it was running.</summary>
-    internal static string AlreadyRunningText(int port) => $"Weir is already running at {TrayState.AddressFor(port)}";
+    /// <summary>Weir was started again while it was running. A click opens it.</summary>
+    internal static string AlreadyRunningText(int port) => $"Weir is already running at {TrayState.AddressFor(port)}. Click to open it.";
 
     /// <summary>Change port worked. A click opens Weir at the new address.</summary>
     internal static string PortMovedText(int port) => $"Weir is now at {TrayState.AddressFor(port)}. Click to open it.";

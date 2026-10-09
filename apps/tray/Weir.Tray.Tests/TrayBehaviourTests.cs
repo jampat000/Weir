@@ -52,7 +52,7 @@ public sealed class TrayBehaviourTests : IDisposable
     [Fact]
     public void A_second_launch_is_told_where_Weir_is()
     {
-        Assert.Equal("Weir is already running at http://localhost:9400", TrayBalloons.AlreadyRunningText(9400));
+        Assert.Equal("Weir is already running at http://localhost:9400. Click to open it.", TrayBalloons.AlreadyRunningText(9400));
     }
 
     [Fact]

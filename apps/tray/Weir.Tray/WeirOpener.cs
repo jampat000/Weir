@@ -36,6 +36,10 @@ sealed class WeirOpener(
         }
     }
 
+    /// <summary>Weir was started again while it was running: says so, with the address, and a click on the balloon opens Weir.</summary>
+    internal void ShowAlreadyRunning() =>
+        balloon("Weir", TrayBalloons.AlreadyRunningText(port()), ToolTipIcon.Info, () => Open("already-running-balloon"));
+
     /// <summary>Opens a page of Weir, unless a window was opened a moment ago.</summary>
     internal void Open(string source, string relativePath = "/")
     {
