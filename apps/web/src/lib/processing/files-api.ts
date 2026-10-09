@@ -88,6 +88,8 @@ export interface ProcessingFile {
   relative_path: string;
   status: ProcessingFileStatus;
   status_reason: string;
+  /** The file is no longer in the watched folder and Weir is about to stop listing it, so nothing that needs the file can be done. */
+  source_gone?: boolean;
   blocked_by_connection: string | null;
   size_bytes: number;
   failure_class: string | null;

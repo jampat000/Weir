@@ -4934,6 +4934,11 @@ export interface components {
        */
       size_changed_at?: string | null;
       /**
+       * Source Gone
+       * @description True while Weir holds a file that is no longer in the watched folder, before it stops listing it. Nothing that needs the file can be done to it.
+       */
+      source_gone?: boolean;
+      /**
        * Status
        * @enum {string}
        */

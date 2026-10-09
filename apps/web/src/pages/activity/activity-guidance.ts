@@ -53,11 +53,18 @@ const RETRY_OWED: Guidance = {
   next: "It looks again shortly after the wait ends. Use Try again to run it now.",
 };
 
+/** A file that is no longer in the watched folder: Weir stops listing it by itself. */
+const SOURCE_GONE: Guidance = {
+  title: "This file is no longer in the watched folder.",
+  next: "There is nothing to do. Weir stops listing it shortly; use Remove from list to clear it now.",
+};
+
 /** What a person can do about a file, in the words of the buttons beside it. */
 export function fileGuidance(
   file: ProcessingFile,
   processingPaused: boolean,
 ): Guidance {
+  if (file.source_gone) return SOURCE_GONE;
   if (pausedWhenChecked(file)) {
     return processingPaused
       ? {
