@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
 namespace Weir.Tray.Tests;
@@ -15,7 +16,7 @@ public sealed class TrayUpdateRequestsTests : IDisposable
     private static readonly TimeSpan FinishCeiling = TimeSpan.FromSeconds(30);
 
     private readonly TempDirectory _home = TempDirectory.AsWeirHome();
-    private readonly DelayWatchingTimeProvider _clock = new();
+    private readonly FakeTimeProvider _clock = new();
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Channel<UpdateMenuAction> _changes = Channel.CreateUnbounded<UpdateMenuAction>();
     private readonly ConcurrentQueue<UpdateMode> _announced = new();
@@ -209,9 +210,8 @@ public sealed class TrayUpdateRequestsTests : IDisposable
         var updates = Build(new FakeUpdateService().AlreadyDownloaded(), UpdateMode.DownloadOnly);
         RequestFlag("update-apply-now");
 
-        var handedOver = updates.ActOnRequests();
+        updates.ActOnRequests();
 
-        Assert.True(handedOver);
         Assert.True(_appliedNow.Task.IsCompletedSuccessfully);
         Assert.False(File.Exists(FlagPath("update-apply-now")));
     }
@@ -222,40 +222,52 @@ public sealed class TrayUpdateRequestsTests : IDisposable
         var updates = Build(new FakeUpdateService(), UpdateMode.DownloadOnly);
         RequestFlag("update-apply-now");
 
-        var handedOver = updates.ActOnRequests();
+        updates.ActOnRequests();
 
-        Assert.False(handedOver);
         Assert.False(_appliedNow.Task.IsCompleted);
         Assert.True(File.Exists(FlagPath("update-apply-now")));
     }
 
-    [Fact]
-    public void Requests_made_while_the_tray_was_not_running_are_dropped_at_start()
+    [Fact(Timeout = 30_000)]
+    public async Task A_check_asked_for_before_the_tray_started_is_acted_on_at_start()
     {
         var service = new FakeUpdateService();
         var updates = Build(service, UpdateMode.NotifyOnly);
         RequestFlag("update-check-now");
-        RequestFlag("update-download-now");
 
         updates.Start();
+        await UntilSettledAsync();
 
         Assert.False(File.Exists(FlagPath("update-check-now")));
-        Assert.False(File.Exists(FlagPath("update-download-now")));
-        Assert.Equal((0, 0), (service.Checks, service.Downloads));
+        Assert.Equal(1, service.Checks);
+        Assert.Equal(("idle", false, "9.9.9", null), ReadState());
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task The_watcher_acts_on_a_request_a_second_after_it_is_made()
+    public async Task A_download_asked_for_before_the_tray_started_is_acted_on_at_start()
+    {
+        var service = new FakeUpdateService();
+        var updates = Build(service, UpdateMode.NotifyOnly);
+        RequestFlag("update-download-now");
+
+        updates.Start();
+        await UntilSettledAsync();
+
+        Assert.False(File.Exists(FlagPath("update-download-now")));
+        Assert.Equal(("downloaded", true, "9.9.9", null), ReadState());
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task A_request_made_while_the_tray_runs_is_acted_on_when_the_watcher_hears_it()
     {
         var service = new FakeUpdateService();
         var updates = Build(service, UpdateMode.NotifyOnly);
         updates.Start();
-        await _clock.NextDelay();
 
         RequestFlag("update-check-now");
-        _clock.Advance(TimeSpan.FromSeconds(1));
         await UntilSettledAsync();
 
+        Assert.False(File.Exists(FlagPath("update-check-now")));
         Assert.Equal(1, service.Checks);
         Assert.Equal(("idle", false, "9.9.9", null), ReadState());
     }

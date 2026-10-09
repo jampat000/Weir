@@ -14,9 +14,6 @@ sealed class TrayUpdates
     private const string ApplyNowFlagFileName = "update-apply-now";
     private const string NoNewerVersion = "There is no newer version of Weir to download.";
 
-    // Short, so a button press shows its answer within a second.
-    private static readonly TimeSpan RequestPollInterval = TimeSpan.FromSeconds(1);
-
     private readonly string _runtimeHome;
     private readonly UpdateSettings _settings;
     private readonly IUpdateService _service;
@@ -24,6 +21,7 @@ sealed class TrayUpdates
     private readonly TimeProvider _clock;
     private readonly CancellationToken _shutdown;
     private readonly Lock _idleWatchLock = new();
+    private readonly Lock _requestsLock = new();
     private int _activity;
     private Task? _idleWatch;
 
@@ -31,7 +29,7 @@ sealed class TrayUpdates
     /// <param name="runtimeHome">Where update-state.json, the request flags and the server's work-state.json live.</param>
     /// <param name="settings">The operator's update choices.</param>
     /// <param name="callbacks">How the rest of the tray hears about updates and applies them.</param>
-    /// <param name="clock">Times the wait for Weir to be idle and the look for requests.</param>
+    /// <param name="clock">Times the wait for Weir to be idle and the log of a failing watcher.</param>
     /// <param name="shutdown">Cancelled when the tray is ending, which ends every loop here.</param>
     internal TrayUpdates(
         IUpdateService service,
@@ -76,7 +74,7 @@ sealed class TrayUpdates
             _service.IsDownloaded,
             _service.PendingVersion);
 
-    /// <summary>Starts the start-up check, the periodic check and the request watcher, as the settings say.</summary>
+    /// <summary>Starts the start-up check, the periodic check and the watch for requests, as the settings say.</summary>
     internal void Start()
     {
         if (!_service.IsInstalled)
@@ -89,9 +87,18 @@ sealed class TrayUpdates
         // installed) would otherwise keep telling the server an update is waiting until a check next finishes.
         WriteState(UpdatePhase.Idle, null);
 
-        // Asked for while the tray was not running: nobody is waiting on it now.
-        Take(CheckNowFlagFileName, actEvenIfNotRemoved: false);
-        Take(DownloadNowFlagFileName, actEvenIfNotRemoved: false);
+        // The one look at the flags a person left before this run is the watcher's first.
+        var requests = new UpdateRequestWatcher(
+            _runtimeHome,
+            () => BackgroundWork.Forget("Update requests", () =>
+            {
+                ActOnRequests();
+                return Task.CompletedTask;
+            }),
+            TrayLog.Write,
+            _clock);
+        _shutdown.Register(requests.Dispose);
+        requests.Start();
 
         if (_settings.CheckOnStartup)
         {
@@ -104,7 +111,6 @@ sealed class TrayUpdates
             BackgroundWork.RunLoop("Periodic update check", ct => CheckPeriodicallyAsync(interval, ct), _shutdown);
         }
 
-        BackgroundWork.RunLoop("Update request watcher", WatchForRequestsAsync, _shutdown);
     }
 
     internal void CheckInBackground() => BackgroundWork.Forget("Update check", CheckAsync);
@@ -120,47 +126,34 @@ sealed class TrayUpdates
         }
     }
 
-    // System › About asks for a step by creating a flag file: check now, download now, or restart and apply.
-    private async Task WatchForRequestsAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Does what the flag files in the runtime home ask for, once each: System › About asks for a step by creating one
+    /// (check now, download now, or restart and apply). A check or download that is already under way is not started again.
+    /// </summary>
+    internal void ActOnRequests()
     {
-        using var timer = new PeriodicTimer(RequestPollInterval, _clock);
-        while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+        lock (_requestsLock)
         {
-            if (ActOnRequests())
+            if (_service.IsDownloaded && Take(ApplyNowFlagFileName))
             {
-                return;
+                TrayLog.Write("Apply-now flag detected - applying update and restarting.");
+                _callbacks.OnUi(_callbacks.ApplyNow);
+            }
+            if (Take(CheckNowFlagFileName))
+            {
+                TrayLog.Write("Check-now flag detected - checking for an update.");
+                CheckInBackground();
+            }
+            if (Take(DownloadNowFlagFileName))
+            {
+                TrayLog.Write("Download-now flag detected - downloading the update.");
+                DownloadInBackground();
             }
         }
     }
 
-    /// <summary>
-    /// Does what the flag files in the runtime home ask for, once each. Returns true once the downloaded update has been
-    /// handed over to install, which ends this process. A check or download that is already under way is not started again.
-    /// </summary>
-    internal bool ActOnRequests()
-    {
-        if (_service.IsDownloaded && Take(ApplyNowFlagFileName, actEvenIfNotRemoved: true))
-        {
-            TrayLog.Write("Apply-now flag detected - applying update and restarting.");
-            _callbacks.OnUi(_callbacks.ApplyNow);
-            return true;
-        }
-        if (Take(CheckNowFlagFileName, actEvenIfNotRemoved: false))
-        {
-            TrayLog.Write("Check-now flag detected - checking for an update.");
-            CheckInBackground();
-        }
-        if (Take(DownloadNowFlagFileName, actEvenIfNotRemoved: false))
-        {
-            TrayLog.Write("Download-now flag detected - downloading the update.");
-            DownloadInBackground();
-        }
-        return false;
-    }
-
-    // A flag that cannot be removed would be found again every second. Applying anyway is right: the flag asked for it,
-    // and the restart replaces this process; a check or download is left undone rather than repeated.
-    private bool Take(string flagFileName, bool actEvenIfNotRemoved)
+    // The flag asked for its step, so the step is taken even when the flag cannot be removed.
+    private bool Take(string flagFileName)
     {
         var flagPath = Path.Combine(_runtimeHome, flagFileName);
         if (!File.Exists(flagPath))
@@ -170,13 +163,12 @@ sealed class TrayUpdates
         try
         {
             File.Delete(flagPath);
-            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             TrayLog.Write($"Could not delete {flagPath}: {ex.Message}");
-            return actEvenIfNotRemoved;
         }
+        return true;
     }
 
     // Automatic mode only: the person who chose it is not there to press Restart to update.
