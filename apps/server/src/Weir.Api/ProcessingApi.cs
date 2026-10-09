@@ -33,6 +33,9 @@ public static class ProcessingApi
         services.TryAddSingleton<LibraryFolderChainCheck>();
         // Checked again on its own while a browser is watching, so a folder going missing or coming back is pushed, not asked for.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPeriodicTask, FolderChecksTask>());
+        // Looks at Weir's own folders whether or not a browser is open, because the tray's dot turns amber for one it cannot reach.
+        services.TryAddSingleton<FolderReachability>();
+        services.AddHostedService(provider => provider.GetRequiredService<FolderReachability>());
         // First-run setup offers libraries from what is connected, and checks the ones a person confirms.
         services.TryAddSingleton<LibrarySuggestions>();
         services.TryAddSingleton<ProposedLibraryCheck>();

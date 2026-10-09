@@ -197,7 +197,7 @@ public sealed class LiveStreamApiTests
     }
 
     [Fact]
-    public async Task Removing_a_failed_file_from_the_list_reaches_an_open_stream_as_a_jobs_change()
+    public async Task Removing_a_failed_file_from_the_list_reaches_an_open_stream_as_a_library_scan_change()
     {
         var (server, client) = await StartSignedInAsync();
         await using var _server = server;
@@ -212,6 +212,6 @@ public sealed class LiveStreamApiTests
         using var removed = await client.SendAsync(HttpMethod.Delete, $"/api/v1/processing/files/{fileId}", new { csrf_token = await client.CsrfAsync() });
 
         Assert.Equal(System.Net.HttpStatusCode.NoContent, removed.StatusCode);
-        await AssertTopicArrivesAsync(reader, DataTopics.Jobs);
+        await AssertTopicArrivesAsync(reader, DataTopics.LibraryScan);
     }
 }

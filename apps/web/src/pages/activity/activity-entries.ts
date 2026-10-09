@@ -152,8 +152,7 @@ export function activityGroupOf(file: ProcessingFile): ActivityGroup | null {
 const SKIPPED_BY_RULE = /^skipped because/i;
 
 /**
- * Whether a file waits on a person: a failure, a rejection, a hold with no clock on it, or a skip by a rule. The server counts
- * the same files for the tray (`FileStateStore.CountWaitingOnPersonAsync`), so change both together.
+ * Whether a file waits on a person: a failure, a rejection, a hold with no clock on it, or a skip by a rule.
  */
 export function waitsOnAPerson(file: ProcessingFile): boolean {
   switch (file.status) {

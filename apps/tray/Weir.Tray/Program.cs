@@ -115,7 +115,7 @@ static class Program
                 TrayLog.Write($"Velopack: before uninstall v{v}");
                 KillRunningProcesses($"Velopack before uninstall v{v}");
                 TrayRunningMark.ForThisUser().Forget(InstalledTray());
-                StartupRegistration.ForThisUser().Disable();
+                StartupRegistration.ForThisUser().Uninstall();
                 FirewallInstallHooks.RemoveRuleIfElevated();
             })
             .OnBeforeUpdateFastCallback((v) =>

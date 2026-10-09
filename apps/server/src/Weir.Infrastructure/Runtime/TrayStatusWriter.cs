@@ -7,7 +7,6 @@ using Weir.Core.Settings;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
-using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
@@ -15,7 +14,7 @@ namespace Weir.Infrastructure.Runtime;
 
 /// <summary>
 /// Keeps <see cref="TrayStatus.FileName"/> in Weir's data folder true to what the tray shows: written once the server starts,
-/// again whenever the pause, the files waiting on a person or the media managers that do not answer change, and a last time
+/// again whenever the pause, the media managers that do not answer or the folders Weir cannot reach change, and a last time
 /// when the server stops cleanly, saying it is no longer running. A burst of changes is read once, at most once a
 /// <see cref="Settle"/>, and the file is replaced (whole, then renamed into place) only when its contents differ.
 /// A reading or a write that fails is tried again after <see cref="RetryAfter"/>, so what is on show is never left as an earlier run
@@ -29,17 +28,20 @@ public sealed class TrayStatusWriter : BackgroundService
     /// <summary>How long to wait before a reading or a write that failed is tried again.</summary>
     public static readonly TimeSpan RetryAfter = TimeSpan.FromSeconds(2);
 
+    /// <summary>The longest the first status waits for the first look at the folders.</summary>
+    public static readonly TimeSpan FirstLookWait = TimeSpan.FromSeconds(5);
+
     /// <summary>How many times the file is written, and how far apart, when the rename is refused.</summary>
     private const int WriteAttempts = 5;
     private static readonly TimeSpan WriteRetryAfter = TimeSpan.FromMilliseconds(100);
 
-    /// <summary>The data that makes up the status: the pause, the files that wait on a person (their jobs and scans move them), and the managers.</summary>
-    private static readonly HashSet<string> Topics = [DataTopics.Pause, DataTopics.Jobs, DataTopics.LibraryScan, DataTopics.Libraries, DataTopics.Connections];
+    /// <summary>The data that makes up the status: the pause, the managers, and the folders (<see cref="FolderReachability"/> says when its answer changes).</summary>
+    private static readonly HashSet<string> Topics = [DataTopics.Pause, DataTopics.Connections, DataTopics.FolderChecks];
 
     private readonly WeirOptions _options;
     private readonly SqliteDatabase _database;
     private readonly SuiteSettingsStore _settings;
-    private readonly FileStateStore _files;
+    private readonly FolderReachability _folders;
     private readonly MediaManagerConnectionStore _managers;
     private readonly DataChangePublisher _changes;
     private readonly TimeProvider _time;
@@ -53,7 +55,7 @@ public sealed class TrayStatusWriter : BackgroundService
         WeirOptions options,
         SqliteDatabase database,
         SuiteSettingsStore settings,
-        FileStateStore files,
+        FolderReachability folders,
         MediaManagerConnectionStore managers,
         DataChangePublisher changes,
         TimeProvider time,
@@ -62,7 +64,7 @@ public sealed class TrayStatusWriter : BackgroundService
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _files = files ?? throw new ArgumentNullException(nameof(files));
+        _folders = folders ?? throw new ArgumentNullException(nameof(folders));
         _managers = managers ?? throw new ArgumentNullException(nameof(managers));
         _changes = changes ?? throw new ArgumentNullException(nameof(changes));
         _time = time ?? throw new ArgumentNullException(nameof(time));
@@ -119,11 +121,28 @@ public sealed class TrayStatusWriter : BackgroundService
     /// <summary>Writes the status at once, then again after each settled change; a reading or a write that fails is tried again after <see cref="RetryAfter"/>.</summary>
     private async Task KeepWrittenAsync(CancellationToken stoppingToken)
     {
+        await FirstFolderLookAsync(stoppingToken).ConfigureAwait(false);
         await ReadWriteAndRetryAsync(stoppingToken).ConfigureAwait(false);
         await foreach (var _ in _stale.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
             await Task.Delay(Settle, stoppingToken).ConfigureAwait(false);
             await ReadWriteAndRetryAsync(stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// The first status waits for the folders to have been looked at, so the tray never hears "all well" before they have been. A
+    /// share that is slow to answer holds it for no longer than <see cref="FirstLookWait"/>; the tray hears the rest as it comes.
+    /// </summary>
+    private async Task FirstFolderLookAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await _folders.FirstLook.WaitAsync(FirstLookWait, _time, stoppingToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // Written without them; FolderReachability tells the writer when it has an answer.
         }
     }
 
@@ -160,13 +179,12 @@ public sealed class TrayStatusWriter : BackgroundService
         {
             var row = await _settings.GetAsync(uow).ConfigureAwait(false);
             var pause = row is null ? null : PauseState.Resolve(row, Timestamp.UtcNow(_time).AsUtc);
-            var files = await _files.CountWaitingOnPersonAsync(uow).ConfigureAwait(false);
             var managers = await _managers.ListEnabledAsync(uow).ConfigureAwait(false);
             return new TrayStatus(
                 pause is { Paused: true },
                 pause is { Paused: true, PausedUntil: { } until } ? until.AsUtc : null,
-                files,
                 [.. managers.Where(manager => manager.LastTestOk == false).Select(manager => manager.Label)],
+                _folders.Unreachable,
                 ServerOk: true);
         }
     }

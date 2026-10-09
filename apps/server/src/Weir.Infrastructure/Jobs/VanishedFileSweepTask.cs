@@ -74,8 +74,8 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
                 // In the server log as well as Activity, so it can be checked on a machine where nobody signs in.
                 LogForgotten(forgotten.Count, library.Name, string.Join(", ", forgotten));
 
-                // A failed or held file that left the folder is no longer waiting on a person; no job moved to say so.
-                _changes?.Publish(DataTopics.Jobs);
+                // A file that left the folder drops off the open screens; no job moved to say so.
+                _changes?.Publish(DataTopics.LibraryScan);
             }
         }
     }

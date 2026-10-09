@@ -33,7 +33,7 @@ public sealed partial class FileStateStore
 {
     private readonly DataChangePublisher? _changes;
 
-    /// <param name="changes">Told, once a delete or a cancel commits, so the tray's count of files waiting on a person follows it; none says nothing.</param>
+    /// <param name="changes">Told, once a delete or a cancel commits, so every open screen drops the file at once; none says nothing.</param>
     public FileStateStore(DataChangePublisher? changes = null)
     {
         _changes = changes;
@@ -88,21 +88,6 @@ public sealed partial class FileStateStore
         return counts;
     }
 
-    /// <summary>
-    /// How many files wait on a person: failed, rejected, held with no clock on the hold, or skipped by one of the workflow's own
-    /// rules ("Skipped because ..."). The web app's <c>waitsOnAPerson</c> (<c>activity-entries.ts</c>) says the same, and its
-    /// badge, Needs you panel and Activity chip count the same files.
-    /// </summary>
-    public Task<long> CountWaitingOnPersonAsync(UnitOfWork uow) =>
-        uow.CountAsync(
-            "SELECT COUNT(*) FROM files WHERE status IN (@failed, @rejected) " +
-            "OR (status = @on_hold AND hold_until IS NULL) " +
-            "OR (status = @skipped AND status_reason LIKE 'skipped because%')",
-            ("@failed", ProcessingFileStatuses.ProcessingFailed),
-            ("@rejected", ProcessingFileStatuses.Rejected),
-            ("@on_hold", ProcessingFileStatuses.OnHold),
-            ("@skipped", ProcessingFileStatuses.Skipped));
-
     /// <summary>Removes Weir's record; never touches the file on disk.</summary>
     public async Task ForgetAsync(UnitOfWork uow, long id)
     {
@@ -140,10 +125,10 @@ public sealed partial class FileStateStore
     }
 
     /// <summary>
-    /// Says, once <paramref name="uow"/> commits, that a file left the list of those waiting on a person without a job moving: the
-    /// tray counts them (<see cref="CountWaitingOnPersonAsync"/>) from the queue's topic, which a pass or a scan announces on its own.
+    /// Says, once <paramref name="uow"/> commits, that a file left the lists without a job moving, so Activity and the Dashboard
+    /// drop it at once, on the topic that refreshes the file lists.
     /// </summary>
-    private void AnnounceOnCommit(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.Jobs);
+    private void AnnounceOnCommit(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.LibraryScan);
 
     /// <summary>Every row of the library, for a scan that decides about all of its files from one read.</summary>
     public Task<List<ProcessingFileRecord>> ListForLibraryAsync(UnitOfWork uow, long libraryId) =>

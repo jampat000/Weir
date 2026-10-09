@@ -9,17 +9,17 @@ using Weir.Infrastructure.Tests.Platform;
 namespace Weir.Infrastructure.Tests.Processing;
 
 /// <summary>
-/// The tray counts the files waiting on a person from the queue's topic, so a file that leaves that list with no job moving (a
+/// Open screens read the file lists again on the library-scan topic, so a file that leaves them with no job moving (a
 /// person removing it, a hand-off cancelled, a file that left its folder) says so itself, once the change has committed.
 /// </summary>
-public sealed class FilesWaitingOnPersonAnnouncedTests : IDisposable
+public sealed class FilesLeavingTheListsAnnouncedTests : IDisposable
 {
     private readonly StoreFixture _store = new();
     private readonly DataChangePublisher _changes = new();
     private readonly FileStateStore _files;
     private readonly LibraryStore _libraries = new();
 
-    public FilesWaitingOnPersonAnnouncedTests() => _files = new FileStateStore(_changes);
+    public FilesLeavingTheListsAnnouncedTests() => _files = new FileStateStore(_changes);
 
     public void Dispose() => _store.Dispose();
 
@@ -56,7 +56,7 @@ public sealed class FilesWaitingOnPersonAnnouncedTests : IDisposable
             await uow.CommitAsync();
         }
 
-        Assert.Equal([DataTopics.Jobs], await HeardAsync(heard));
+        Assert.Equal([DataTopics.LibraryScan], await HeardAsync(heard));
         Assert.Equal(0, await _store.Scalar("SELECT count(*) FROM files"));
     }
 
@@ -99,7 +99,7 @@ public sealed class FilesWaitingOnPersonAnnouncedTests : IDisposable
             await uow.CommitAsync();
         }
 
-        Assert.Equal([DataTopics.Jobs], await HeardAsync(held));
+        Assert.Equal([DataTopics.LibraryScan], await HeardAsync(held));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class FilesWaitingOnPersonAnnouncedTests : IDisposable
 
         await sweep.RunOnceAsync(CancellationToken.None);
 
-        Assert.Equal([DataTopics.Jobs], await HeardAsync(heard));
+        Assert.Equal([DataTopics.LibraryScan], await HeardAsync(heard));
         Assert.Equal(0, await _store.Scalar("SELECT count(*) FROM files"));
     }
 }

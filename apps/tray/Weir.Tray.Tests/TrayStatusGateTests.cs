@@ -11,7 +11,7 @@ public sealed class TrayStatusGateTests
     private static readonly DateTime ServerStarted = new(2026, 10, 9, 9, 0, 0, DateTimeKind.Utc);
 
     private static TrayStatusReading Wrote(DateTime at, bool serverOk = true) =>
-        new(new TrayStatus(false, null, 0, [], serverOk), at, Failed: false);
+        new(new TrayStatus(false, null, [], [], serverOk), at, Failed: false);
 
     private static TrayStatusGate Gate(DateTime? serverStarted = null) => new(() => serverStarted ?? ServerStarted);
 
@@ -79,7 +79,7 @@ public sealed class TrayStatusGateTests
         gate.Offer(leftBehind);
 
         Assert.Null(gate.Current);
-        Assert.Equal(TrayBadge.None, new TrayState(ServerPhase.Running, gate.Current, null, 9347).Badge);
+        Assert.Equal(TrayDot.Starting, new TrayState(ServerPhase.Running, gate.Current, null, 9347).Dot);
     }
 
     [Fact]
