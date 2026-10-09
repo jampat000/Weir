@@ -5,8 +5,8 @@ using Weir.Core.Time;
 
 namespace Weir.Core.Updates;
 
-/// <summary>One asset of a GitHub release.</summary>
-public sealed record GitHubReleaseAsset(string Name, string ApiUrl, string BrowserDownloadUrl, long SizeBytes, string? ContentType);
+/// <summary>One asset of a GitHub release; <paramref name="ApiUrl"/> is null for an asset taken from the release feed, which has no API address.</summary>
+public sealed record GitHubReleaseAsset(string Name, string? ApiUrl, string BrowserDownloadUrl, long SizeBytes, string? ContentType);
 
 /// <summary>A GitHub release.</summary>
 public sealed record GitHubReleaseRecord(
@@ -77,12 +77,13 @@ public static class ReleaseCatalog
     public const string Repo = "Weir";
 
     /// <summary>
-    /// The release list, not <c>/releases/latest</c>: that endpoint never returns a pre-release, so it would find nothing
-    /// while only pre-releases are published.
+    /// The API's release list, asked only when <see cref="ReleasesFeedUrl"/> cannot be read, as every call counts against an
+    /// unauthenticated allowance of 60 an hour for the whole network. The list, not <c>/releases/latest</c>: that endpoint
+    /// never returns a pre-release, so it would find nothing while only pre-releases are published.
     /// </summary>
     public const string ReleasesUrl = "https://api.github.com/repos/jampat000/Weir/releases?per_page=30";
 
-    /// <summary>The public release feed: reading it does not count against the API allowance.</summary>
+    /// <summary>The public release feed, where the newest release is looked up first: reading it does not count against the API allowance.</summary>
     public const string ReleasesFeedUrl = "https://github.com/jampat000/Weir/releases.atom";
     public const string WindowsInstallerAssetName = "Weir-win-Setup.exe";
     public const string LegacyWindowsInstallerAssetName = "WeirSetup.exe";
@@ -103,6 +104,10 @@ public static class ReleaseCatalog
         var stripped = text.StartsWith('v') ? text[1..] : text;
         return stripped.Length == 0 ? null : stripped;
     }
+
+    /// <summary>Where a file attached to the release tagged <paramref name="tag"/> is downloaded from, which does not count against the API allowance either.</summary>
+    public static string DownloadUrl(string tag, string assetName) =>
+        $"https://github.com/{Owner}/{Repo}/releases/download/{Uri.EscapeDataString(tag)}/{Uri.EscapeDataString(assetName)}";
 
     public static string TagUrl(string tag) => $"https://github.com/{Owner}/{Repo}/releases/tag/{Uri.EscapeDataString(tag)}";
 
