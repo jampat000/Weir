@@ -55,16 +55,20 @@ public sealed partial class MediaTools
     public async Task RunMkvmergeAsync(
         IReadOnlyList<string> argv,
         Action<FfmpegProgressUpdate>? progressCallback = null,
+        long sourceBytes = 0,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(argv);
         LogFfmpegDebug(MkvmergeCommands.DebugSummary(argv));
         var started = _timeProvider.GetTimestamp();
+        var timeoutSeconds = ToolTimeLimits.OverallSeconds(sourceBytes);
         var result = await _runner.RunAsync(
             new ProcessRequest
             {
                 Argv = argv,
-                Timeout = TimeSpan.FromSeconds(MkvmergeCommands.MkvmergeTimeoutSeconds),
+                Timeout = TimeSpan.FromSeconds(timeoutSeconds),
+                // --gui-mode reports at every percent, so a write that says nothing for this long has stopped.
+                IdleTimeout = SilenceLimit,
                 Stdin = ProcessInput.Null,
                 // mkvmerge writes its diagnostics to stdout as well as its progress, so the tail that a failure
                 // message needs is collected from the lines as they arrive rather than from Stderr alone.
@@ -89,10 +93,7 @@ public sealed partial class MediaTools
                     },
             },
             cancellationToken).ConfigureAwait(false);
-        if (result.TimedOut)
-        {
-            throw new MediaToolTimeoutException(ProbeOutput.TimeoutMessage(argv, MkvmergeCommands.MkvmergeTimeoutSeconds));
-        }
+        ThrowIfStopped(result, argv, timeoutSeconds);
 
         if (result.ExitCode is not 0 and not MkvmergeCommands.ExitCodeWarnings)
         {

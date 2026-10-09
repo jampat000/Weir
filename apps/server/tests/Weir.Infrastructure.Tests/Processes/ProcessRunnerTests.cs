@@ -163,22 +163,84 @@ public sealed class ProcessRunnerTests
         Assert.Equal("stop", error.Message);
     }
 
-    [PosixFact("cmd.exe cannot close its own stdout while the child keeps running; this proves the exit-after-close grace.")]
-    public async Task A_process_that_lingers_after_closing_stdout_is_killed_after_the_grace()
+    [Fact]
+    public async Task A_process_that_goes_silent_is_killed_once_it_has_said_nothing_for_the_idle_limit()
     {
+        using var started = new StartedProcesses();
+
         var result = await Runner.RunAsync(new ProcessRequest
         {
-            Argv = ["/bin/sh", "-c", "exec 1>&-; sleep 60"],
-            OnStdoutLine = _ => { },
-            ExitTimeoutAfterStdoutClosed = TimeSpan.FromMilliseconds(300),
-            Timeout = TimeSpan.FromSeconds(30),
+            Argv = TalkativeSlowTool(),
+            OnStarted = started.Remember,
+            IdleTimeout = TimeSpan.FromMilliseconds(500),
+            Timeout = TimeSpan.FromMinutes(5),
         });
 
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
         Assert.True(result.TimedOut);
+        Assert.Equal(1, started.Count);
+        await started.AllHaveEndedAsync();
     }
 
     [Fact]
-    public async Task A_process_that_takes_a_while_to_exit_after_closing_stdout_is_waited_for_within_the_grace()
+    public async Task A_process_that_keeps_talking_is_left_to_run_for_longer_than_the_idle_limit()
+    {
+        var lines = new List<string>();
+
+        // 40 lines 100 ms apart run for about four seconds, over the three-second limit, but never fall silent for it.
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "chatter", "100", "40"],
+            OnStdoutLine = lines.Add,
+            IdleTimeout = TimeSpan.FromSeconds(3),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.None, result.Timeout);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(40, lines.Count);
+    }
+
+    [Fact]
+    public async Task A_process_that_stops_talking_part_way_is_killed_by_the_idle_limit_and_what_it_said_is_kept()
+    {
+        var lines = new List<string>();
+        using var started = new StartedProcesses();
+
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "chatter-then-stall", "50", "5"],
+            OnStarted = started.Remember,
+            OnStdoutLine = lines.Add,
+            IdleTimeout = TimeSpan.FromSeconds(2),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
+        Assert.Equal(5, lines.Count);
+        await started.AllHaveEndedAsync();
+    }
+
+    [Fact]
+    public async Task A_process_that_lingers_after_closing_stdout_is_killed_once_it_has_been_silent_for_the_idle_limit()
+    {
+        using var started = new StartedProcesses();
+
+        var result = await Runner.RunAsync(new ProcessRequest
+        {
+            Argv = [StandInPath, "close-stdout-then-linger", "60"],
+            OnStarted = started.Remember,
+            OnStdoutLine = _ => { },
+            IdleTimeout = TimeSpan.FromMilliseconds(500),
+            Timeout = TimeSpan.FromMinutes(5),
+        });
+
+        Assert.Equal(ProcessTimeoutKind.Idle, result.Timeout);
+        await started.AllHaveEndedAsync();
+    }
+
+    [Fact]
+    public async Task A_process_that_takes_a_while_to_exit_after_closing_stdout_is_waited_for_within_the_idle_limit()
     {
         var lines = new List<string>();
 
@@ -186,7 +248,7 @@ public sealed class ProcessRunnerTests
         {
             Argv = [StandInPath, "close-stdout-then-linger", "1"],
             OnStdoutLine = lines.Add,
-            ExitTimeoutAfterStdoutClosed = TimeSpan.FromSeconds(30),
+            IdleTimeout = TimeSpan.FromSeconds(30),
             Timeout = TimeSpan.FromSeconds(60),
         });
 

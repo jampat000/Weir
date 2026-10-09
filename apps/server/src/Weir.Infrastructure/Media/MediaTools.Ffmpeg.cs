@@ -20,9 +20,10 @@ public sealed partial class MediaTools
     /// just the direct ffmpeg child: ffmpeg can spawn helper processes (for some hwaccel or filter setups) that
     /// would otherwise survive and keep the output file open.</item>
     /// </list>
-    /// The progress-mode timeout is enforced by <see cref="Processes.ProcessRunner"/> on a wall-clock timer
-    /// independent of stdout activity, so it also stops a process that goes silent (stuck reading its input,
-    /// for example) rather than only checking its limit as a progress line arrives.
+    /// The wall-clock limit is enforced by <see cref="Processes.ProcessRunner"/> on a timer independent of stdout activity.
+    /// It is only the outer bound, sized to the file by the caller (<see cref="ToolTimeLimits.OverallSeconds"/>). A run that
+    /// reports progress is also stopped when it falls silent for <see cref="ToolTimeLimits.SilenceSeconds"/>, so a read
+    /// that has stopped is found in minutes while a slow one is left to finish.
     /// </remarks>
     public async Task RunFfmpegAsync(
         IReadOnlyList<string> argv,
@@ -71,7 +72,7 @@ public sealed partial class MediaTools
                 Stdin = ProcessInput.Null,
                 Stderr = ProcessOutput.Tail,
                 TailBytes = FfmpegCommands.FfmpegStderrTailBytes,
-                ExitTimeoutAfterStdoutClosed = TimeSpan.FromSeconds(FfmpegCommands.ProgressExitWaitSeconds),
+                IdleTimeout = SilenceLimit,
                 OnStdoutLine = line =>
                 {
                     var update = tracker.Feed(line, _timeProvider.GetElapsedTime(started).TotalSeconds);
@@ -86,8 +87,8 @@ public sealed partial class MediaTools
         {
             case ProcessTimeoutKind.Overall:
                 throw new MediaToolException("ffmpeg timed out") { PlainMessage = ToolFailureText.TookTooLong };
-            case ProcessTimeoutKind.ExitAfterStdoutClosed:
-                throw new MediaToolTimeoutException(ProbeOutput.TimeoutMessage(progressArgv, FfmpegCommands.ProgressExitWaitSeconds));
+            case ProcessTimeoutKind.Idle:
+                throw new MediaToolException("the media tool stopped reporting progress") { PlainMessage = ToolFailureText.Stalled };
             case ProcessTimeoutKind.None:
             default:
                 break;
@@ -96,6 +97,24 @@ public sealed partial class MediaTools
         if (result.ExitCode != 0)
         {
             throw ProbeOutput.FfmpegFailure(ProbeOutput.TailText(result.Stderr));
+        }
+    }
+
+    /// <summary>
+    /// Throws for a run the process runner stopped: past its size-based limit (<see cref="MediaToolTimeoutException"/>, as probing
+    /// reports a timeout), or silent for <see cref="ToolTimeLimits.SilenceSeconds"/> (<see cref="MediaToolException"/>).
+    /// </summary>
+    private static void ThrowIfStopped(ProcessResult result, IReadOnlyList<string> argv, int timeoutSeconds)
+    {
+        switch (result.Timeout)
+        {
+            case ProcessTimeoutKind.Overall:
+                throw new MediaToolTimeoutException(ProbeOutput.TimeoutMessage(argv, timeoutSeconds));
+            case ProcessTimeoutKind.Idle:
+                throw new MediaToolException("the media tool stopped reporting progress") { PlainMessage = ToolFailureText.Stalled };
+            case ProcessTimeoutKind.None:
+            default:
+                break;
         }
     }
 
@@ -111,6 +130,7 @@ public sealed partial class MediaTools
         LogFfmpegDebug(FfmpegCommands.DebugSummary(argv));
         return RunFfmpegAsync(
             argv,
+            ToolTimeLimits.OverallSeconds(SizeOfFile(request.Source)),
             progressCallback: request.ProgressCallback,
             durationSeconds: request.DurationSeconds,
             cancellationToken: cancellationToken);

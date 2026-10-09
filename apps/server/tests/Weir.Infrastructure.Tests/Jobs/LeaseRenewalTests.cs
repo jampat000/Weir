@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Jobs;
@@ -108,6 +109,43 @@ public sealed class LeaseRenewalTests : IDisposable
         Assert.Equal(JobProcessOutcome.Processed, await runTask);
     }
 
+    [Fact]
+    public async Task A_renewal_that_meets_a_busy_database_is_tried_again_at_the_next_tick()
+    {
+        await _db.Store.EnqueueOrGetAsync("busy", Kind, maxAttempts: 3);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new DelegateHandler(Kind, async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+        });
+        var attempts = new List<DateTimeOffset>();
+        using var heartbeatWaiting = new SemaphoreSlim(0);
+        var processor = Processor(handler, heartbeatWaiting, renew: (jobId, owner, expiry) =>
+        {
+            attempts.Add(expiry);
+            return attempts.Count == 1
+                ? throw new SqliteException("database is locked", 5)
+                : _db.Store.RenewLeaseAsync(jobId, owner, expiry, _time.GetUtcNow());
+        });
+
+        const int leaseSeconds = 3;
+        var runTask = processor.ProcessOneAsync("worker", leaseSeconds, _time.GetUtcNow());
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForHeartbeatAsync(heartbeatWaiting);
+
+        for (var step = 0; step < 3; step++)
+        {
+            _time.Advance(TimeSpan.FromSeconds(leaseSeconds / 3.0));
+            await WaitForHeartbeatAsync(heartbeatWaiting);
+        }
+
+        Assert.Equal(3, attempts.Count);
+        release.TrySetResult();
+        Assert.Equal(JobProcessOutcome.Processed, await runTask);
+    }
+
     /// <summary>
     /// Wait for the heartbeat's next "waiting for my next tick" signal. A missing signal means the heartbeat
     /// stopped renewing (it lost the lease, or crashed), which is exactly what these tests must catch.
@@ -117,7 +155,7 @@ public sealed class LeaseRenewalTests : IDisposable
             await heartbeatWaiting.WaitAsync(TimeSpan.FromSeconds(5)),
             "The lease-renewal heartbeat did not renew and wait for its next tick in time.");
 
-    private ProcessingJobProcessor Processor(IJobHandler handler, SemaphoreSlim? heartbeatWaiting = null) =>
+    private ProcessingJobProcessor Processor(IJobHandler handler, SemaphoreSlim? heartbeatWaiting = null, Func<long, string, DateTimeOffset, Task<bool>>? renew = null) =>
         new(
             new ProcessingJobStore(new SqliteDatabase(_db.DbPath, pooling: false), _time),
             new JobHandlerRegistry([handler]),
@@ -128,5 +166,6 @@ public sealed class LeaseRenewalTests : IDisposable
             NullLogger<ProcessingJobProcessor>.Instance)
         {
             LeaseRenewalWaiting = heartbeatWaiting is null ? null : () => heartbeatWaiting.Release(),
+            RenewOverride = renew,
         };
 }

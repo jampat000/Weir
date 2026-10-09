@@ -34,7 +34,10 @@ public static class ToolFailureText
     public const string TookTooLong =
         "Weir's media tools took too long on this file, so Weir stopped them. Try the file again; if it keeps happening, the file may be damaged.";
 
-    public const string NoSpace = "The drive Weir was writing to ran out of space. Free some space, then try the file again.";
+    public const string Stalled =
+        "Weir's media tools stopped making progress on this file, so Weir stopped them. Check that the drive or network share holding it is still working, then try the file again.";
+
+    public const string NoSpace ="The drive Weir was writing to ran out of space. Free some space, then try the file again.";
 
     public const string NotAllowed =
         "Weir wasn't allowed to open or write a file it needed. Check that Weir can read the watched folder and write to its work and output folders.";

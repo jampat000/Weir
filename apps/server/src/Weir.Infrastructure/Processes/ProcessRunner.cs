@@ -37,8 +37,8 @@ public enum ProcessTimeoutKind
     /// <summary><see cref="ProcessRequest.Timeout"/> elapsed.</summary>
     Overall,
 
-    /// <summary>stdout closed but the process did not exit within <see cref="ProcessRequest.ExitTimeoutAfterStdoutClosed"/>.</summary>
-    ExitAfterStdoutClosed,
+    /// <summary>The process wrote nothing to stdout or stderr for <see cref="ProcessRequest.IdleTimeout"/>.</summary>
+    Idle,
 }
 
 /// <summary>One child process to run, argv token for token (no shell).</summary>
@@ -47,7 +47,7 @@ public sealed record ProcessRequest
     /// <summary>The executable, then its arguments.</summary>
     public required IReadOnlyList<string> Argv { get; init; }
 
-    /// <summary>Wall-clock limit; the whole process tree is killed when it passes.</summary>
+    /// <summary>Wall-clock limit; the whole process tree is killed when it passes. See also <see cref="IdleTimeout"/>.</summary>
     public TimeSpan? Timeout { get; init; }
 
     public ProcessInput Stdin { get; init; } = ProcessInput.Null;
@@ -66,8 +66,12 @@ public sealed record ProcessRequest
     /// </summary>
     public Action<string>? OnStdoutLine { get; init; }
 
-    /// <summary>With <see cref="OnStdoutLine"/>: how long to wait for exit once stdout closes.</summary>
-    public TimeSpan? ExitTimeoutAfterStdoutClosed { get; init; }
+    /// <summary>
+    /// How long the process may write nothing, to stdout or stderr, before it is taken to have stopped and its process
+    /// tree is killed. A liveness limit for a tool that reports progress, in place of guessing how long the work takes;
+    /// it also bounds the wait for exit once the output has closed.
+    /// </summary>
+    public TimeSpan? IdleTimeout { get; init; }
 
     /// <summary>
     /// Called with the child's process id as soon as it has started, before anything is read from it. It must not throw: the
@@ -157,7 +161,8 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
         }
 
         using var timeoutSource = request.Timeout is { } timeout ? new CancellationTokenSource(timeout) : new CancellationTokenSource();
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
+        using var idle = new IdleWatch(request.IdleTimeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token, idle.Token);
 
         Exception? callbackError = null;
         var stdoutSink = new OutputSink(request.OnStdoutLine is null ? request.Stdout : ProcessOutput.Discard, request.TailBytes);
@@ -184,8 +189,8 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
                 }
             });
 
-        var stdoutTask = PumpAsync(process.StandardOutput.BaseStream, stdoutSink, lines);
-        var stderrTask = PumpAsync(process.StandardError.BaseStream, stderrSink, null);
+        var stdoutTask = PumpAsync(process.StandardOutput.BaseStream, stdoutSink, lines, idle.Activity);
+        var stderrTask = PumpAsync(process.StandardError.BaseStream, stderrSink, null, idle.Activity);
         var timedOut = ProcessTimeoutKind.None;
 
         try
@@ -193,20 +198,6 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
             if (lines is not null)
             {
                 await stdoutTask.WaitAsync(linked.Token).ConfigureAwait(false);
-                if (callbackError is null && request.ExitTimeoutAfterStdoutClosed is { } grace)
-                {
-                    using var graceSource = CancellationTokenSource.CreateLinkedTokenSource(linked.Token);
-                    graceSource.CancelAfter(grace);
-                    try
-                    {
-                        await process.WaitForExitAsync(graceSource.Token).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) when (!linked.IsCancellationRequested)
-                    {
-                        timedOut = ProcessTimeoutKind.ExitAfterStdoutClosed;
-                        KillTree(process);
-                    }
-                }
             }
 
             await process.WaitForExitAsync(linked.Token).ConfigureAwait(false);
@@ -216,7 +207,7 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
             KillTree(process);
             await DrainAsync(process, stdoutTask, stderrTask).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            timedOut = ProcessTimeoutKind.Overall;
+            timedOut = timeoutSource.IsCancellationRequested ? ProcessTimeoutKind.Overall : ProcessTimeoutKind.Idle;
         }
 
         await DrainAsync(process, stdoutTask, stderrTask).ConfigureAwait(false);
@@ -305,7 +296,7 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
         }
     }
 
-    private static async Task PumpAsync(Stream stream, OutputSink sink, UniversalNewlineSplitter? lines)
+    private static async Task PumpAsync(Stream stream, OutputSink sink, UniversalNewlineSplitter? lines, Action onOutput)
     {
         var buffer = new byte[16 * 1024];
         while (true)
@@ -329,11 +320,62 @@ public sealed partial class ProcessRunner(ILogger<ProcessRunner>? logger = null,
                 break;
             }
 
+            onOutput();
             sink.Write(buffer.AsSpan(0, read));
             lines?.Feed(buffer.AsSpan(0, read));
         }
 
         lines?.Finish();
+    }
+
+    /// <summary>
+    /// Cancels its token once nothing has been written for the limit. Output pushes the deadline back, but only when a twentieth
+    /// of the limit has passed since it was last pushed, so a chatty tool does not cost a timer reset per read; a run is therefore
+    /// stopped no sooner than 95% of the limit after its last output.
+    /// </summary>
+    private sealed class IdleWatch : IDisposable
+    {
+        private readonly CancellationTokenSource _source = new();
+        private readonly TimeSpan? _limit;
+        private long _pushedAt;
+
+        public IdleWatch(TimeSpan? limit)
+        {
+            _limit = limit;
+            if (limit is { } span)
+            {
+                _pushedAt = Stopwatch.GetTimestamp();
+                _source.CancelAfter(span);
+            }
+        }
+
+        public CancellationToken Token => _source.Token;
+
+        public void Activity()
+        {
+            if (_limit is not { } limit)
+            {
+                return;
+            }
+
+            var now = Stopwatch.GetTimestamp();
+            if (Stopwatch.GetElapsedTime(Volatile.Read(ref _pushedAt), now) < limit / 20)
+            {
+                return;
+            }
+
+            Volatile.Write(ref _pushedAt, now);
+            try
+            {
+                _source.CancelAfter(limit);
+            }
+            catch (ObjectDisposedException)
+            {
+                // The run is over; a pipe still being read has nothing left to keep alive.
+            }
+        }
+
+        public void Dispose() => _source.Dispose();
     }
 
     /// <summary>Keeps everything, the tail, or nothing.</summary>

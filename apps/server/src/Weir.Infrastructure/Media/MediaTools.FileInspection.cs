@@ -43,6 +43,9 @@ public sealed partial class MediaTools
         return new MediaFileState(resolvedPath, exists, isFile, size, mtime);
     }
 
+    /// <summary>The size of a file a tool is about to read, which sizes how long the tool is given; 0 when it cannot be read.</summary>
+    internal long SizeOfFile(string path) => _inspectFile(path) is { IsFile: true, SizeBytes: > 0 } state ? state.SizeBytes : 0;
+
     private static string ResolvePath(string path)
     {
         try

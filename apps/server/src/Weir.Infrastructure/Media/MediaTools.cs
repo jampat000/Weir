@@ -46,6 +46,9 @@ public sealed partial class MediaTools
         _timeProvider = timeProvider;
     }
 
+    /// <summary>How long a tool that reports progress may say nothing before it is stopped; settable so tests need not wait it out.</summary>
+    internal TimeSpan SilenceLimit { get; init; } = TimeSpan.FromSeconds(ToolTimeLimits.SilenceSeconds);
+
     /// <summary>
     /// <c>logger.debug</c>'s one-line summary of an argv about to run, shared by the ffmpeg and mkvmerge remux
     /// writes (<see cref="FfmpegCommands.DebugSummary"/> and <see cref="MkvmergeCommands.DebugSummary"/>).

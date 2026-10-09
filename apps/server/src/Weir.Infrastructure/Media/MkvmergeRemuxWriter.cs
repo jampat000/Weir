@@ -59,7 +59,7 @@ public sealed class MkvmergeRemuxWriter(MediaTools tools, IMediaToolResolver res
             request.Plan,
             trackIds,
             identification.Attachments);
-        await tools.RunMkvmergeAsync(argv, request.ProgressCallback, cancellationToken).ConfigureAwait(false);
+        await tools.RunMkvmergeAsync(argv, request.ProgressCallback, tools.SizeOfFile(request.Source), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

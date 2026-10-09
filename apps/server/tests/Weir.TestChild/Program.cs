@@ -9,6 +9,9 @@ const string Hold = "hold";
 const string AnnounceAndHold = "announce-and-hold";
 const string HoldThroughChild = "hold-through-child";
 const string CloseStdoutThenLinger = "close-stdout-then-linger";
+const string Chatter = "chatter";
+const string ChatterThenStall = "chatter-then-stall";
+const string TickLine = "tick";
 const string AnnouncementLine = "ready";
 const string FinishedLine = "done";
 
@@ -54,8 +57,27 @@ switch (args.FirstOrDefault())
         await Task.Delay(TimeSpan.FromSeconds(double.Parse(args[^1], CultureInfo.InvariantCulture)));
         break;
 
+    case Chatter:
+    case ChatterThenStall:
+        // Like an ffmpeg working through a slow read: a line of progress every <period> milliseconds, then either the end or
+        // silence. The period is the second argument and the number of lines the last, because a caller that adds options of
+        // its own puts them between.
+        for (var tick = 0; tick < int.Parse(args[^1], CultureInfo.InvariantCulture); tick++)
+        {
+            Console.Out.WriteLine(TickLine);
+            Console.Out.Flush();
+            await Task.Delay(TimeSpan.FromMilliseconds(double.Parse(args[1], CultureInfo.InvariantCulture)));
+        }
+
+        if (args[0] == ChatterThenStall)
+        {
+            await Task.Delay(lifetime);
+        }
+
+        break;
+
     default:
-        Console.Error.WriteLine($"Unknown mode. Use {Hold}, {AnnounceAndHold}, {HoldThroughChild} or {CloseStdoutThenLinger}.");
+        Console.Error.WriteLine($"Unknown mode. Use {Hold}, {AnnounceAndHold}, {HoldThroughChild}, {CloseStdoutThenLinger}, {Chatter} or {ChatterThenStall}.");
         return 2;
 }
 

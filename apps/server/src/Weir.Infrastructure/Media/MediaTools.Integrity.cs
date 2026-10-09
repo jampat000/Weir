@@ -41,20 +41,20 @@ public sealed partial class MediaTools
         var baseArgv = FfmpegCommands.BuildIntegrityArgv(ffmpeg, path);
         var wantsProgress = expectedDurationSeconds is > 0;
         var argv = wantsProgress ? FfmpegCommands.WithProgress(baseArgv) : baseArgv;
+        var timeoutSeconds = ToolTimeLimits.OverallSeconds(SizeOfFile(path));
         var result = await _runner.RunAsync(
             new ProcessRequest
             {
                 Argv = argv,
-                Timeout = TimeSpan.FromSeconds(FfmpegCommands.FfmpegTimeoutSeconds),
+                Timeout = TimeSpan.FromSeconds(timeoutSeconds),
+                // Only a run that reports progress says anything while it reads; the others have the size-based limit alone.
+                IdleTimeout = wantsProgress ? SilenceLimit : null,
                 Stdin = ProcessInput.Null,
                 Stdout = wantsProgress ? ProcessOutput.Capture : ProcessOutput.Discard,
                 Stderr = ProcessOutput.Capture,
             },
             cancellationToken).ConfigureAwait(false);
-        if (result.TimedOut)
-        {
-            throw new MediaToolTimeoutException(ProbeOutput.TimeoutMessage(argv, FfmpegCommands.FfmpegTimeoutSeconds));
-        }
+        ThrowIfStopped(result, argv, timeoutSeconds);
 
         var stderrText = ProbeOutput.CapturedText(result.Stderr);
         if (result.ExitCode != 0)

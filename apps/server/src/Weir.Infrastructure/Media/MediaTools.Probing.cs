@@ -19,7 +19,7 @@ public sealed partial class MediaTools
     /// </summary>
     public async Task<JsonElement> FfprobeJsonAsync(
         string path,
-        int timeoutSeconds = FfmpegCommands.FfprobeTimeoutSeconds,
+        int? timeoutSeconds = null,
         int probeSizeMb = FfmpegCommands.DefaultProbeSizeMb,
         int analyzeDurationSeconds = FfmpegCommands.DefaultAnalyzeDurationSeconds,
         CancellationToken cancellationToken = default)
@@ -27,7 +27,7 @@ public sealed partial class MediaTools
         ArgumentNullException.ThrowIfNull(path);
         var (ffprobe, _) = _resolver.Resolve();
         var argv = FfmpegCommands.BuildFfprobeArgv(ffprobe, path, probeSizeMb, analyzeDurationSeconds);
-        var (exitCode, stdout, stderr) = await RunFfprobeAsync(path, argv, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+        var (exitCode, stdout, stderr) = await RunFfprobeAsync(path, argv, timeoutSeconds ?? ToolTimeLimits.ProbeSeconds(probeSizeMb), cancellationToken).ConfigureAwait(false);
         if (exitCode != 0)
         {
             // The headline is a sentence; the tool's own text rides along as the exception, which Logs shows as technical detail.

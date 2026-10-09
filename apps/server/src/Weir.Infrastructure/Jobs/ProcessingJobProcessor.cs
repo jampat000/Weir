@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Activity;
 using Weir.Core.Jobs;
@@ -62,6 +63,9 @@ public sealed class ProcessingJobProcessor
 
     /// <summary>Test seam replacing <see cref="ProcessingJobStore.CompleteClaimedAsync"/>.</summary>
     internal Func<long, string, DateTimeOffset, Task<bool>>? CompleteOverride { get; init; }
+
+    /// <summary>Test seam replacing <see cref="ProcessingJobStore.RenewLeaseAsync"/>: job id, lease owner, the new expiry.</summary>
+    internal Func<long, string, DateTimeOffset, Task<bool>>? RenewOverride { get; init; }
 
     /// <summary>
     /// Test seam: called each time the lease-renewal heartbeat has started waiting for its next tick, which
@@ -311,7 +315,22 @@ public sealed class ProcessingJobProcessor
                 LeaseRenewalWaiting?.Invoke();
                 await tick.ConfigureAwait(false);
                 var now = _time.GetUtcNow();
-                var renewed = await _queue.RenewLeaseAsync(jobId, leaseOwner, now + TimeSpan.FromSeconds(leaseSeconds), now, CancellationToken.None).ConfigureAwait(false);
+                bool renewed;
+                try
+                {
+                    var expiry = now + TimeSpan.FromSeconds(leaseSeconds);
+                    renewed = RenewOverride is not null
+                        ? await RenewOverride(jobId, leaseOwner, expiry).ConfigureAwait(false)
+                        : await _queue.RenewLeaseAsync(jobId, leaseOwner, expiry, now, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (SqliteException exception)
+                {
+                    // A busy database must not end the renewals of a job that may run for hours: the lease has two more
+                    // intervals to run, and the next renewal tries again.
+                    _logger.LogWarning(exception, "Lease renewal could not reach the database job_id={JobId} owner={Owner}; trying again.", jobId, leaseOwner);
+                    continue;
+                }
+
                 if (!renewed)
                 {
                     _logger.LogWarning(

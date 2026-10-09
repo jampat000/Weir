@@ -187,7 +187,8 @@ public sealed partial class MediaTools
             new ProcessRequest
             {
                 Argv = argv,
-                Timeout = TimeSpan.FromSeconds(FfmpegCommands.FfmpegTimeoutSeconds),
+                Timeout = TimeSpan.FromSeconds(ToolTimeLimits.OverallSeconds(SizeOfFile(sourcePath))),
+                IdleTimeout = SilenceLimit,
                 Stdin = ProcessInput.Null,
                 Stdout = ProcessOutput.Capture,
                 Stderr = ProcessOutput.Discard,
