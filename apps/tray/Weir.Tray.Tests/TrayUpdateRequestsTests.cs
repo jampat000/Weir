@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
-using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
 namespace Weir.Tray.Tests;
@@ -16,7 +15,7 @@ public sealed class TrayUpdateRequestsTests : IDisposable
     private static readonly TimeSpan FinishCeiling = TimeSpan.FromSeconds(30);
 
     private readonly TempDirectory _home = TempDirectory.AsWeirHome();
-    private readonly FakeTimeProvider _clock = new();
+    private readonly DelayWatchingTimeProvider _clock = new();
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Channel<UpdateMenuAction> _changes = Channel.CreateUnbounded<UpdateMenuAction>();
     private readonly ConcurrentQueue<UpdateMode> _announced = new();
@@ -217,7 +216,7 @@ public sealed class TrayUpdateRequestsTests : IDisposable
     }
 
     [Fact]
-    public void An_apply_request_waits_until_an_update_has_been_downloaded()
+    public void An_apply_request_before_the_download_is_taken_away_and_answered_with_what_to_do()
     {
         var updates = Build(new FakeUpdateService(), UpdateMode.DownloadOnly);
         RequestFlag("update-apply-now");
@@ -225,7 +224,166 @@ public sealed class TrayUpdateRequestsTests : IDisposable
         updates.ActOnRequests();
 
         Assert.False(_appliedNow.Task.IsCompleted);
-        Assert.True(File.Exists(FlagPath("update-apply-now")));
+        Assert.False(File.Exists(FlagPath("update-apply-now")));
+        Assert.Equal(("failed", false, null, "Download the update first."), ReadState());
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task An_apply_request_is_not_left_for_the_download_that_finishes_later()
+    {
+        var release = new TaskCompletionSource();
+        var service = new FakeUpdateService { HoldDownload = release.Task };
+        var updates = Build(service, UpdateMode.DownloadOnly);
+        RequestFlag("update-download-now");
+        updates.ActOnRequests();
+        RequestFlag("update-apply-now");
+        updates.ActOnRequests();
+
+        release.SetResult();
+        await updates.RequestedWork!;
+        updates.ActOnRequests();
+
+        Assert.False(_appliedNow.Task.IsCompleted);
+        Assert.False(File.Exists(FlagPath("update-apply-now")));
+        Assert.True(service.IsDownloaded);
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task An_apply_request_while_a_step_is_under_way_leaves_the_state_saying_so()
+    {
+        var release = new TaskCompletionSource();
+        var updates = Build(new FakeUpdateService { HoldCheck = release.Task }, UpdateMode.NotifyOnly);
+        RequestFlag("update-check-now");
+        updates.ActOnRequests();
+        Assert.Equal(UpdateMenuAction.Wait, await NextChangeAsync());
+        File.Delete(FlagPath("update-state.json"));
+        RequestFlag("update-apply-now");
+
+        updates.ActOnRequests();
+
+        Assert.Equal(("checking", false, null, null), ReadState());
+        release.SetResult();
+        await updates.RequestedWork!;
+    }
+
+    [Theory]
+    [InlineData("update-check-now")]
+    [InlineData("update-download-now")]
+    [InlineData("update-apply-now")]
+    public void A_flag_left_long_ago_is_thrown_away_and_not_acted_on(string flag)
+    {
+        var service = new FakeUpdateService().AlreadyDownloaded();
+        var updates = Build(service, UpdateMode.NotifyOnly);
+        RequestFlag(flag);
+        File.SetLastWriteTimeUtc(FlagPath(flag), _clock.GetUtcNow().UtcDateTime - TimeSpan.FromDays(2));
+
+        updates.ActOnRequests();
+
+        Assert.False(File.Exists(FlagPath(flag)));
+        Assert.Null(updates.RequestedWork);
+        Assert.False(_appliedNow.Task.IsCompleted);
+        Assert.False(File.Exists(FlagPath("update-state.json")));
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task A_flag_a_moment_old_is_still_a_click()
+    {
+        var service = new FakeUpdateService();
+        var updates = Build(service, UpdateMode.NotifyOnly);
+        RequestFlag("update-download-now");
+        File.SetLastWriteTimeUtc(FlagPath("update-download-now"), _clock.GetUtcNow().UtcDateTime - TrayUpdates.RequestMaxAge + TimeSpan.FromSeconds(30));
+
+        updates.ActOnRequests();
+        await updates.RequestedWork!;
+
+        Assert.Equal(1, service.Downloads);
+    }
+
+    [Fact]
+    public async Task A_download_does_not_start_while_an_update_is_downloaded_and_waiting()
+    {
+        var service = new FakeUpdateService().AlreadyDownloaded();
+        var updates = Build(service, UpdateMode.NotifyOnly);
+
+        await updates.DownloadAsync();
+
+        Assert.Equal((0, 0), (service.Checks, service.Downloads));
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task A_request_that_cannot_be_taken_up_writes_the_state_as_it_is()
+    {
+        var release = new TaskCompletionSource();
+        var service = new FakeUpdateService { HoldCheck = release.Task };
+        var updates = Build(service, UpdateMode.NotifyOnly);
+        RequestFlag("update-check-now");
+        updates.ActOnRequests();
+        Assert.Equal(UpdateMenuAction.Wait, await NextChangeAsync());
+        File.Delete(FlagPath("update-state.json"));
+
+        await updates.CheckAsync(asked: true);
+        Assert.Equal(("checking", false, null, null), ReadState());
+        File.Delete(FlagPath("update-state.json"));
+        await updates.DownloadAsync(asked: true);
+        Assert.Equal(("checking", false, null, null), ReadState());
+
+        release.SetResult();
+        await updates.RequestedWork!;
+    }
+
+    [Fact]
+    public async Task A_check_or_download_asked_for_while_an_update_waits_writes_that_it_is_downloaded()
+    {
+        var updates = Build(new FakeUpdateService(), UpdateMode.DownloadOnly);
+        await updates.DownloadAsync();
+        File.Delete(FlagPath("update-state.json"));
+
+        await updates.CheckAsync(asked: true);
+        Assert.Equal(("downloaded", true, "9.9.9", null), ReadState());
+        File.Delete(FlagPath("update-state.json"));
+        await updates.DownloadAsync(asked: true);
+        Assert.Equal(("downloaded", true, "9.9.9", null), ReadState());
+    }
+
+    [Fact]
+    public async Task A_periodic_check_that_cannot_run_writes_nothing()
+    {
+        var updates = Build(new FakeUpdateService(), UpdateMode.DownloadOnly);
+        await updates.DownloadAsync();
+        File.Delete(FlagPath("update-state.json"));
+
+        await updates.CheckAsync();
+
+        Assert.False(File.Exists(FlagPath("update-state.json")));
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task A_watcher_that_cannot_be_built_does_not_stop_the_start_up_check()
+    {
+        var service = new FakeUpdateService();
+        var notAFolder = FlagPath("not-a-folder");
+        File.WriteAllText(notAFolder, string.Empty);
+        var updates = Build(service, UpdateMode.NotifyOnly, notAFolder, checkOnStartup: true);
+
+        updates.Start();
+        await UntilSettledAsync();
+
+        Assert.Equal(1, service.Checks);
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task The_tray_says_it_is_alive_when_it_starts_and_every_half_minute()
+    {
+        var updates = Build(new FakeUpdateService(), UpdateMode.NotifyOnly);
+        var started = _clock.GetUtcNow();
+
+        updates.Start();
+        await _clock.NextDelay();
+        Assert.Equal(started, HeartbeatAt());
+
+        _clock.Advance(TrayUpdates.HeartbeatInterval);
+        await _clock.NextDelay();
+        Assert.Equal(started + TrayUpdates.HeartbeatInterval, HeartbeatAt());
     }
 
     [Fact(Timeout = 30_000)]
@@ -272,12 +430,12 @@ public sealed class TrayUpdateRequestsTests : IDisposable
         Assert.Equal(("idle", false, "9.9.9", null), ReadState());
     }
 
-    private TrayUpdates Build(FakeUpdateService service, UpdateMode mode)
+    private TrayUpdates Build(FakeUpdateService service, UpdateMode mode, string? home = null, bool checkOnStartup = false)
     {
         _updates = new TrayUpdates(
             service,
-            _home.Path,
-            new UpdateSettings { Mode = mode, CheckOnStartup = false, CheckIntervalMinutes = 0 },
+            home ?? _home.Path,
+            new UpdateSettings { Mode = mode, CheckOnStartup = checkOnStartup, CheckIntervalMinutes = 0 },
             new UpdateCallbacks(
                 OnUi: action => action(),
                 Changed: () => _changes.Writer.TryWrite(_updates!.MenuState().Action),
@@ -298,6 +456,9 @@ public sealed class TrayUpdateRequestsTests : IDisposable
         {
         }
     }
+
+    private DateTimeOffset HeartbeatAt() =>
+        DateTimeOffset.Parse(JsonNode.Parse(File.ReadAllText(FlagPath("tray-heartbeat.json")))!["at"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture);
 
     private string FlagPath(string name) => Path.Combine(_home.Path, name);
 

@@ -96,4 +96,50 @@ public sealed class UpdateRequestWatcherTests : IDisposable
         watcher.Dispose();
         watcher.Dispose();
     }
+
+    [Fact]
+    public void A_watcher_that_failed_is_built_again_and_hears_the_next_flag()
+    {
+        using var watcher = StartWatching();
+        NextLook();
+
+        watcher.OnWatcherError(new IOException("The network name is no longer available."));
+        NextLook();
+        File.WriteAllText(Path.Combine(_home.Path, "update-check-now"), string.Empty);
+
+        NextLook();
+        Assert.Equal(1, watcher.Rebuilt);
+    }
+
+    [Fact]
+    public void A_watcher_that_cannot_be_built_again_is_tried_until_it_can()
+    {
+        var builds = 0;
+        using var watcher = new UpdateRequestWatcher(
+            _home.Path,
+            () => _looks.Add(Interlocked.Increment(ref _looked)),
+            _logged.Add,
+            _clock,
+            () => ++builds == 2 ? throw new IOException("Not now.") : new FileSystemWatcher(_home.Path, "update-*-now"));
+        watcher.Start();
+        NextLook();
+
+        watcher.OnWatcherError(new IOException("Gone."));
+
+        NextLook();
+        Assert.Equal((3, 1), (builds, watcher.Rebuilt));
+    }
+
+    [Fact]
+    public void An_error_after_the_watcher_is_disposed_is_ignored()
+    {
+        var watcher = StartWatching();
+        NextLook();
+        watcher.Dispose();
+
+        var thrown = Record.Exception(() => watcher.OnWatcherError(new IOException("Late.")));
+
+        Assert.Null(thrown);
+        Assert.Equal(0, watcher.Rebuilt);
+    }
 }
