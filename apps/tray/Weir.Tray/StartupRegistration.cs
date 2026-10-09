@@ -5,10 +5,11 @@ namespace Weir.Tray;
 
 /// <summary>
 /// Starts Weir at sign-in through the current user's Run key. It is off until the person says yes, when the first run asks
-/// (<see cref="StartWithWindowsPrompt"/>) or from the tray menu's "Start with Windows". A sign-in start passes
+/// (<see cref="StartWithWindowsPrompt"/>) or from the tray menu's "Start with Windows", and either answer is recorded
+/// (<see cref="StartWithWindowsAnswer"/>). A sign-in start passes
 /// <see cref="Program.NoBrowserArgument"/> because nobody asked to see Weir then (#638).
 /// </summary>
-sealed class StartupRegistration(string runKeyPath, string startupFolder, string? executable)
+sealed class StartupRegistration(string runKeyPath, StartWithWindowsAnswer answer, string startupFolder, string? executable)
 {
     private const string DefaultRunKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "Weir";
@@ -16,7 +17,7 @@ sealed class StartupRegistration(string runKeyPath, string startupFolder, string
 
     /// <summary>The current user's registration for the running Weir.</summary>
     internal static StartupRegistration ForThisUser() =>
-        new(DefaultRunKeyPath, Environment.GetFolderPath(Environment.SpecialFolder.Startup), Environment.ProcessPath);
+        new(DefaultRunKeyPath, StartWithWindowsAnswer.ForThisUser(), Environment.GetFolderPath(Environment.SpecialFolder.Startup), Environment.ProcessPath);
 
     /// <summary>Whether Weir starts when the person signs in.</summary>
     internal bool IsEnabled
@@ -86,17 +87,36 @@ sealed class StartupRegistration(string runKeyPath, string startupFolder, string
         }
     }
 
-    /// <summary>Switches it: off if it is on, on if it is off. This is the tray menu's "Start with Windows".</summary>
-    internal void Toggle()
+    /// <summary>Whether the person has said yes or no, by the first-run question or the menu.</summary>
+    internal bool IsAnswered => answer.IsRecorded;
+
+    /// <summary>
+    /// Whether the entry is there but nobody chose it: an older version registered it at install, with no question asked.
+    /// </summary>
+    internal bool IsSetWithoutAnswer => IsEnabled && !IsAnswered;
+
+    /// <summary>The person's answer to the question: yes turns it on, no turns it off, and either way it is not asked again.</summary>
+    internal void Choose(bool startWithWindows)
     {
-        if (IsEnabled)
-        {
-            Disable();
-        }
-        else
+        if (startWithWindows)
         {
             Enable();
         }
+        else
+        {
+            Disable();
+        }
+        answer.Record();
+    }
+
+    /// <summary>Switches it: off if it is on, on if it is off. This is the tray menu's "Start with Windows", and it is an answer.</summary>
+    internal void Toggle() => Choose(!IsEnabled);
+
+    /// <summary>Removes the entry and the record of an answer, when Weir is uninstalled.</summary>
+    internal void Uninstall()
+    {
+        Disable();
+        answer.Forget();
     }
 
     /// <summary>
