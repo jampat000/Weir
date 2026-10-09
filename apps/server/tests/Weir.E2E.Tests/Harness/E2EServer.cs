@@ -11,6 +11,8 @@ namespace Weir.E2E.Tests.Harness;
 /// </summary>
 public sealed class E2EServer : IAsyncLifetime
 {
+    private const string NoRouteToTheInternet = "http://127.0.0.1:9";
+
     private WeirServer? _server;
     private IPlaywright? _playwright;
 
@@ -25,10 +27,17 @@ public sealed class E2EServer : IAsyncLifetime
 
     /// <summary>
     /// A server of its own, set up as the Windows package is (the About screen offers an update to install only there), for a
-    /// test that has to stop and start it: the shared server serves every other test and is left running.
+    /// test that has to stop and start it: the shared server serves every other test and is left running. Its own look at the
+    /// releases goes through a proxy that refuses every connection, so what the tray says (the test, through the tray's files) is
+    /// all the About screen has to go on, whatever Weir has been released since.
     /// </summary>
     public static Task<WeirServer> StartWindowsInstallAsync() =>
-        WeirServer.StartNewAsync(Environment.With(("WEIR_RUNTIME", "windows")));
+        WeirServer.StartNewAsync(Environment.With(
+            ("WEIR_RUNTIME", "windows"),
+            ("HTTPS_PROXY", NoRouteToTheInternet),
+            ("HTTP_PROXY", NoRouteToTheInternet),
+            ("ALL_PROXY", NoRouteToTheInternet),
+            ("NO_PROXY", string.Empty)));
 
     /// <summary>
     /// A server of its own that probes files with the fake tools, for a test whose files must take as long to look at as it

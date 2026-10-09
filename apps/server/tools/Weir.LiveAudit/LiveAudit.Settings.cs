@@ -186,9 +186,21 @@ internal sealed partial class LiveAudit
             await page.Locator("html").GetAttributeAsync("data-mm-density") is null,
             "the page still carries a display density");
         await VisibleAsync(page.GetByTestId("suite-settings-upgrade-tab"), "Upgrade section");
-        await ClickAsync(
-            page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Check again →", Exact = true }),
-            "refresh upgrade status");
+        // The Windows package asks the tray (Check now, Download update, Restart and apply); any other install re-reads the status.
+        var updateButtons = page.GetByTestId("suite-settings-update-actions");
+        if (await updateButtons.CountAsync() > 0)
+        {
+            await VisibleAsync(updateButtons, "update buttons");
+            Require(
+                await updateButtons.GetByRole(AriaRole.Button).CountAsync() == 3,
+                "the update buttons are not Check now, Download update and Restart and apply");
+        }
+        else
+        {
+            await ClickAsync(
+                page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Check again →", Exact = true }),
+                "refresh upgrade status");
+        }
 
         // Exercise the wizard's supported re-entry path, then leave it with the safe skip action so the disposable
         // audit account remains usable.
@@ -207,7 +219,7 @@ internal sealed partial class LiveAudit
         await OpenSidebarAsync("System");
         await VisibleAsync(page.GetByTestId("suite-settings-global"), "return to System › About");
         await ScreenshotAsync("system-instance");
-        Record("System › About: time zone, runtime facts, upgrade refresh, and wizard re-entry");
+        Record("System › About: time zone, runtime facts, update buttons, and wizard re-entry");
     }
 
     private async Task SystemBackupsLogsSecurityAsync()
