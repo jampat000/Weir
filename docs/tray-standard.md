@@ -82,4 +82,4 @@ Quit <App>                                   (hover text says what it stops)
 - **A second launch** shows a balloon from the running copy, "<App> is already running", with the address.
 - **Balloons:**
   - a click does what the balloon offers: open Updates, Restart, open the logs folder, Try again;
-  - they stay 10 s for information and 30 s for problems you must read.
+  - Windows decides how long a notice stays: it ignores the time an app asks for. So a notice is never the only place a problem shows. Anything you must act on also shows in the red dot, the hover text and the menu's status line, until it is dealt with.
