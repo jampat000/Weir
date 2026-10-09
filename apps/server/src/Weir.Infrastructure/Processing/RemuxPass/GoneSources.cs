@@ -23,7 +23,21 @@ internal static class GoneSources
             var source = RemuxPassPaths.ResolveMediaFileUnderRoot(watchedFolder, relativePath);
             return !File.Exists(source) && !Directory.Exists(source);
         }
-        catch (ArgumentException)
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>True when the watched folder is there and so is the file under it: neither gone nor unknown.</summary>
+    public static bool IsBack(string watchedFolder, string relativePath)
+    {
+        try
+        {
+            var source = RemuxPassPaths.ResolveMediaFileUnderRoot(watchedFolder, relativePath);
+            return File.Exists(source) || Directory.Exists(source);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return false;
         }

@@ -10,7 +10,7 @@ Use the Velopack setup exe from the release being validated.
 2. Confirm application files install under `%LocalAppData%\Weir`.
 3. Confirm runtime data is created under `C:\ProgramData\Weir`.
 4. Launch Weir from the Start Menu shortcut.
-5. Confirm the tray icon appears at once with a grey ring in its corner while Weir starts, and that the ring goes when Weir is ready. Confirm the first run asked "Start Weir when you sign in to Windows?" and that `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` has a `Weir` entry only if you said yes. Confirm a notice from the tray icon says Weir is running, that no browser window opened by itself, and that clicking the notice opens the app on `http://localhost:9347/` (or the port shown in the tray's `Change port` item if 9347 was taken).
+5. Confirm the tray icon appears at once with a blinking dot in its corner while Weir starts, and that the dot stops blinking and goes green once Weir is ready and everything it relies on answers (amber, with the hover text naming it, if Deluno or a workflow folder does not). Confirm the first run asked "Start Weir when you sign in to Windows?" and that `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` has a `Weir` entry only if you said yes. Confirm a notice from the tray icon says Weir is running, that no browser window opened by itself, and that clicking the notice opens the app on `http://localhost:9347/` (or the port shown in the tray's `Change port` item if 9347 was taken).
 6. Confirm the **Create admin** screen appears when no user exists.
 7. Attempt a password shorter than 8 characters and confirm it is blocked.
 8. Create the first user with a valid password.

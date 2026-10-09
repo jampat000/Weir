@@ -38,6 +38,33 @@ describe("eventDisplay for a finished pass", () => {
     expect(display.meaning).toBe("attention");
   });
 
+  it.each(["skipped_guardrail", "source_not_ready", "source_gone"])(
+    "never shows a pass that finished nothing (%s) as processed",
+    (outcome) => {
+      const display = eventDisplay({
+        ...passEvent({ outcome, ok: true, reason: "Left alone for a reason." }),
+        title: "Skipped Gallery.mkv",
+      });
+
+      expect(display.title).toBe("Skipped Gallery.mkv");
+      expect(display.summary).toBe("Left alone for a reason.");
+      expect(display.meaning).toBe("idle");
+      expect(display.chip).not.toBe("File processed");
+    },
+  );
+
+  it("names a skip under the workflow's minimum size by its code", () => {
+    const display = eventDisplay(
+      passEvent({
+        outcome: "skipped_guardrail",
+        ok: true,
+        skip_kind: "below_minimum_size",
+      }),
+    );
+
+    expect(display.chip).toBe("Under the minimum size");
+  });
+
   it("shows a real failure as one", () => {
     const display = eventDisplay(passEvent({}));
 

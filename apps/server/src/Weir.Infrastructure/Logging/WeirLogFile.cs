@@ -130,8 +130,7 @@ public sealed class WeirLogFile : IDisposable
             {
                 if (!File.Exists(Path))
                 {
-                    _stream?.Dispose();
-                    _stream = null;
+                    ReopenForAppend();
                     return true;
                 }
 
@@ -161,16 +160,24 @@ public sealed class WeirLogFile : IDisposable
 
                 lock (_lock)
                 {
-                    _stream?.Dispose();
-                    _stream = null;
-                    using (var appended = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    try
                     {
-                        appended.Seek(length, SeekOrigin.Begin);
-                        appended.CopyTo(rewritten);
-                    }
+                        _stream?.Dispose();
+                        _stream = null;
+                        using (var appended = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                        {
+                            appended.Seek(length, SeekOrigin.Begin);
+                            appended.CopyTo(rewritten);
+                        }
 
-                    rewritten.Dispose();
-                    File.Move(temporary, Path, overwrite: true);
+                        rewritten.Dispose();
+                        File.Move(temporary, Path, overwrite: true);
+                    }
+                    finally
+                    {
+                        // Reopened before the lock is released: a writer that got in between would find no stream and drop its line.
+                        ReopenForAppend();
+                    }
                 }
             }
             finally
@@ -197,16 +204,13 @@ public sealed class WeirLogFile : IDisposable
 
             return false;
         }
-        finally
-        {
-            lock (_lock)
-            {
-                if (!_disposed && _stream is null)
-                {
-                    _stream = OpenForAppend(Path);
-                }
-            }
-        }
+    }
+
+    /// <summary>Replace the append handle with a fresh one (none once disposed). The caller holds <see cref="_lock"/>.</summary>
+    private void ReopenForAppend()
+    {
+        _stream?.Dispose();
+        _stream = _disposed ? null : OpenForAppend(Path);
     }
 
     /// <summary>

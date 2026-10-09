@@ -70,6 +70,24 @@ public static class WeirWorkflowApi
         await EnsureOkAsync(response, $"Starting the library scan of workflow {libraryId}");
     }
 
+    /// <summary>Asks for a scan of the workflow's watched folder that only looks and records, as the file watcher's does, and queues nothing.</summary>
+    public static async Task StartWatchedFolderScanAsync(IBrowserContext context, string baseUrl, long libraryId)
+    {
+        await using var response = await context.APIRequest.PostAsync(
+            $"{baseUrl}/api/v1/processing/jobs/watched-folder-remux-scan-dispatch/enqueue",
+            new()
+            {
+                DataObject = new
+                {
+                    csrf_token = await CsrfAsync(context, baseUrl),
+                    media_scope = "movie",
+                    library_id = libraryId,
+                    enqueue_remux_jobs = false,
+                },
+            });
+        await EnsureOkAsync(response, $"Starting the scan of the watched folder of workflow {libraryId}");
+    }
+
     private static async Task<string?> CsrfAsync(IBrowserContext context, string baseUrl)
     {
         await using var csrf = await context.APIRequest.GetAsync($"{baseUrl}/api/v1/auth/csrf");

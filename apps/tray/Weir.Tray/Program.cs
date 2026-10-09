@@ -115,7 +115,7 @@ static class Program
                 TrayLog.Write($"Velopack: before uninstall v{v}");
                 KillRunningProcesses($"Velopack before uninstall v{v}");
                 TrayRunningMark.ForThisUser().Forget(InstalledTray());
-                StartupRegistration.ForThisUser().Disable();
+                StartupRegistration.ForThisUser().Uninstall();
                 FirewallInstallHooks.RemoveRuleIfElevated();
             })
             .OnBeforeUpdateFastCallback((v) =>
@@ -285,7 +285,7 @@ static class Program
             saved,
             interactive,
             PortChoice.IsInUse,
-            prompt => PortDialog.Ask(prompt, PortChoice.IsInUse, LoadAppIcon()));
+            AskForPort);
 
         TrayLog.Write($"Port: {decision.Reason} (interactive desktop: {(interactive ? "yes" : "no")})");
         if (decision.Port is { } port && decision.Save)
@@ -294,6 +294,22 @@ static class Program
             TrayLog.Write($"Saved port {port} to {Path.Combine(runtimeHome, PortChoice.SavedPortFileName)}.");
         }
         return decision.Port;
+    }
+
+    // Weir is not running while this waits, so the icon is up, blinking, and a click on it brings the window forward.
+    private static int? AskForPort(PortPrompt prompt)
+    {
+        using var waiting = new StartupIcon(
+            size => LoadAppIcon(size),
+            SystemInformation.SmallIconSize,
+            () =>
+            {
+                if (Application.OpenForms.OfType<PortDialog>().FirstOrDefault() is { } open)
+                {
+                    ForegroundWindow.Bring(open);
+                }
+            });
+        return PortDialog.Ask(prompt, PortChoice.IsInUse, LoadAppIcon());
     }
 
     private static void StopOrphanedServers() =>

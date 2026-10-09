@@ -42,7 +42,11 @@ You can change your mind later, in either of two places. In Weir, open **System 
 **Allow other devices on your network...** or **Only allow this PC**. Weir restarts when you do.
 
 **"Start Weir when you sign in to Windows?"** Nothing starts with Windows unless you say yes. **No** (or a silent install)
-leaves it off. You can switch it any time with **Start with Windows** in the tray menu.
+leaves it off. You can switch it any time with **Start with Windows** in the tray menu. Versions up to
+1.0.0-rc.10 registered it at install without asking. When Weir finds that entry and no answer has been recorded (the answer
+is recorded when you answer the question or tick or untick the menu item), it asks the same question once, after its icon is
+up, the next time you start Weir yourself (never at sign-in, during a silent start, or with no desktop). Yes keeps the entry,
+No removes it.
 
 **"Start Weir" and a port number.** Keep the default, **9347**, unless something else on the PC already uses
 it. In that case the window says so and suggests the next free port. Weir remembers your choice.
@@ -77,9 +81,11 @@ it starts when you sign in and does not open a browser window when it does.
 ## The tray icon
 
 Weir lives in the system tray, next to the clock. If you do not see it, click the small arrow to show
-hidden icons. Click the icon to open Weir in your browser. A small mark in the icon's corner appears only when
-something is different: a grey ring while Weir starts, two bars while processing is paused, a red dot when something
-needs you, a blue dot when an update is waiting. Hover over the icon to read the state. Right-click it for the menu:
+hidden icons. Click the icon to open Weir in your browser. A dot in the icon's corner shows how Weir is
+doing: green when it is running and everything it relies on answers, amber when a media manager such as Deluno or one
+of its folders does not answer, red when Weir has stopped, and blinking while it starts. Two bars in the opposite
+corner mean processing is paused, and a blue arrow means an update is waiting. Hover over the icon to read the state
+and, when the dot is amber or red, what is wrong. Right-click it for the menu:
 
 - **Open Weir**, then a greyed line with the state
 - **Pause processing** (or **Resume processing**) and **Restart Weir**

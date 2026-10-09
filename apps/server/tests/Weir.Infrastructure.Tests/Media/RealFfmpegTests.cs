@@ -99,7 +99,11 @@ internal static class RealFfmpeg
 /// </summary>
 internal static class RealToolAvailability
 {
-    private static readonly TimeSpan VersionCheckTimeout = TimeSpan.FromSeconds(5);
+    /// <summary>
+    /// A working tool answers at once; the wait is long because a starved machine can take many seconds to start one, and
+    /// a check that gives up then reads as "not installed" and skips every real-tool test without a word.
+    /// </summary>
+    private static readonly TimeSpan VersionCheckTimeout = TimeSpan.FromSeconds(60);
 
     public static bool Runs(IReadOnlyList<string> versionArgv)
     {
@@ -123,94 +127,25 @@ internal static class RealToolAvailability
 /// probing, a remux that drops an audio track, validation, truncation and unreadable input. These pin the current
 /// behaviour with the real tools, including where that is not what one would want.
 /// </summary>
-public sealed class RealFfmpegTests : IDisposable
+public sealed class RealFfmpegTests(RealFfmpegFixtures fixtures) : IDisposable, IClassFixture<RealFfmpegFixtures>
 {
     private readonly string _root = Directory.CreateTempSubdirectory("weir-real-ffmpeg-").FullName;
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
-    private static MediaTools Tools() =>
-        new(new ProcessRunner(), new StaticResolver(), new ListLogger<MediaTools>(), TimeProvider.System);
-
-    /// <summary>Three seconds: mpeg4 video, English and French AAC tracks.</summary>
-    private async Task<string> GenerateFixtureAsync(string name = "fixture.mkv", params string[] extra)
-    {
-        var path = Path.Combine(_root, name);
-        string[] argv =
-        [
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
-            "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-            "-f", "lavfi", "-i", "sine=frequency=880:duration=3",
-            "-map", "0", "-map", "1", "-map", "2",
-            "-c:v", "mpeg4", "-c:a", "aac",
-            "-metadata:s:a:0", "language=eng", "-metadata:s:a:1", "language=fre",
-            .. extra,
-            path,
-        ];
-        var result = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = argv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(result.ExitCode == 0, "fixture generation failed: " + ProbeOutput.TailText(result.Stderr));
-        return path;
-    }
+    private static MediaTools Tools(IProcessRunner? runner = null) =>
+        new(runner ?? new ProcessRunner(), new StaticResolver(), new ListLogger<MediaTools>(), TimeProvider.System);
 
     private static List<JsonElement> Streams(JsonElement probe, string codecType) =>
         probe.GetProperty("streams").EnumerateArray().Where(s => s.GetProperty("codec_type").GetString() == codecType).ToList();
 
-    /// <summary>Three seconds: mpeg4 video, an English AAC track and an English SRT subtitle track.</summary>
-    private async Task<string> GenerateFixtureWithSubtitleAsync(string name = "with-subs.mkv")
-    {
-        var path = Path.Combine(_root, name);
-        var subtitlePath = Path.Combine(_root, Path.GetFileNameWithoutExtension(name) + ".srt");
-        await File.WriteAllTextAsync(subtitlePath, "1\n00:00:00,000 --> 00:00:03,000\nHello\n");
-        string[] argv =
-        [
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
-            "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-            "-i", subtitlePath,
-            "-map", "0", "-map", "1", "-map", "2",
-            "-c:v", "mpeg4", "-c:a", "aac", "-c:s", "srt",
-            "-metadata:s:a:0", "language=eng", "-metadata:s:s:0", "language=eng",
-            path,
-        ];
-        var result = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = argv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(result.ExitCode == 0, "fixture generation failed: " + ProbeOutput.TailText(result.Stderr));
-        return path;
-    }
-
     private static string? StreamTitle(JsonElement stream) =>
         stream.TryGetProperty("tags", out var tags) && tags.TryGetProperty("title", out var title) ? title.GetString() : null;
-
-    /// <summary>Three seconds: mpeg4 video, one mono AAC English track, and two chapters from an ffmetadata input.</summary>
-    private async Task<string> GenerateFixtureWithChaptersAsync()
-    {
-        var chaptersPath = Path.Combine(_root, "chapters.txt");
-        await File.WriteAllTextAsync(
-            chaptersPath,
-            ";FFMETADATA1\n"
-            + "[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=1500\ntitle=Chapter 1\n"
-            + "[CHAPTER]\nTIMEBASE=1/1000\nSTART=1500\nEND=3000\ntitle=Chapter 2\n");
-        var path = Path.Combine(_root, "fixture-chapters.mkv");
-        string[] argv =
-        [
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
-            "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-            "-i", chaptersPath,
-            "-map", "0", "-map", "1", "-map_metadata", "2",
-            "-c:v", "mpeg4", "-c:a", "aac",
-            "-metadata:s:a:0", "language=eng",
-            path,
-        ];
-        var result = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = argv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(result.ExitCode == 0, "fixture generation failed: " + ProbeOutput.TailText(result.Stderr));
-        return path;
-    }
 
     [RequiresFfmpegFact]
     public async Task Probe_reads_streams_and_duration()
     {
-        var fixture = await GenerateFixtureAsync();
+        var fixture = await fixtures.StandardAsync();
 
         var probe = await Tools().FfprobeJsonAsync(fixture);
 
@@ -225,7 +160,7 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task A_remux_drops_an_audio_track_reports_progress_and_validates()
     {
-        var fixture = await GenerateFixtureAsync();
+        var fixture = await fixtures.StandardAsync();
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
         var config = RemuxRules.DefaultConfig() with { PrimaryAudioLang = "eng", SecondaryAudioLang = string.Empty, TertiaryAudioLang = string.Empty };
@@ -252,7 +187,7 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task A_correct_remux_that_keeps_the_planned_subtitle_passes_staged_validation()
     {
-        var fixture = await GenerateFixtureWithSubtitleAsync();
+        var fixture = await fixtures.WithSubtitleAsync();
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
         var config = RemuxRules.DefaultConfig() with
@@ -282,7 +217,7 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task An_output_that_drops_a_subtitle_the_plan_kept_fails_staged_validation()
     {
-        var fixture = await GenerateFixtureWithSubtitleAsync("with-subs-wrong.mkv");
+        var fixture = await fixtures.WithSubtitleAsync();
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
         var config = RemuxRules.DefaultConfig() with
@@ -301,13 +236,9 @@ public sealed class RealFfmpegTests : IDisposable
 
         // A deliberately wrong remux: video and audio only, dropping the subtitle the plan says to keep.
         var wrongOutput = Path.Combine(_root, "wrong-output.mkv");
-        var wrongArgv = new[]
-        {
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-i", fixture, "-map", "0:0", "-map", "0:1", "-c", "copy", wrongOutput,
-        };
-        var wrongResult = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = wrongArgv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(wrongResult.ExitCode == 0, "wrong-output generation failed: " + ProbeOutput.TailText(wrongResult.Stderr));
+        await RealFfmpegFixtures.RunAsync(
+            "Making the output that drops the subtitle",
+            RealFfmpegFixtures.Ffmpeg("-i", fixture, "-map", "0:0", "-map", "0:1", "-c", "copy", wrongOutput));
 
         var error = await Assert.ThrowsAsync<MediaToolException>(
             () => tools.ValidateStagedOutputAsync(wrongOutput, fixture, probe, plan, sourceWarnings));
@@ -319,7 +250,7 @@ public sealed class RealFfmpegTests : IDisposable
     public async Task A_remux_standardizes_names_clears_video_titles_and_removes_chapters()
     {
         // #498: real ffmpeg and ffprobe, not the golden fixtures, which do not cover this option.
-        var fixture = await GenerateFixtureWithChaptersAsync();
+        var fixture = await fixtures.WithChaptersAsync();
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
         var probeResult = new ProbeResult(probe);
@@ -350,40 +281,12 @@ public sealed class RealFfmpegTests : IDisposable
         Assert.Empty(new ProbeResult(outputProbeJson).Chapters);
     }
 
-    /// <summary>Three seconds: mpeg4 video, one AAC track, an ASS subtitle, and an attached font with a mimetype tag.</summary>
-    private async Task<string> GenerateFixtureWithAttachmentAsync()
-    {
-        var assPath = Path.Combine(_root, "subs.ass");
-        await File.WriteAllTextAsync(
-            assPath,
-            "[Script Info]\nScriptType: v4.00+\n\n[Events]\nFormat: Layer, Start, End, Text\nDialogue: 0,0:00:00.00,0:00:03.00,Hello\n");
-        var fontPath = Path.Combine(_root, "font.ttf");
-        await File.WriteAllBytesAsync(fontPath, [0x00, 0x01, 0x00, 0x00, 0x00, 0x90, 0x00, 0x03]);
-        var path = Path.Combine(_root, "fixture-attachment.mkv");
-        string[] argv =
-        [
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
-            "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-            "-i", assPath,
-            "-attach", fontPath, "-metadata:s:3", "mimetype=application/x-font-ttf", "-metadata:s:3", "filename=font.ttf",
-            "-map", "0", "-map", "1", "-map", "2",
-            "-c:v", "mpeg4", "-c:a", "aac", "-c:s", "ass",
-            "-metadata:s:a:0", "language=eng",
-            "-metadata:s:2", "language=eng",
-            path,
-        ];
-        var result = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = argv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(result.ExitCode == 0, "fixture generation failed: " + ProbeOutput.TailText(result.Stderr));
-        return path;
-    }
-
     [RequiresFfmpegFact]
     public async Task A_remux_keeps_an_attachment_with_its_mimetype_and_passes_validation()
     {
         // #547 item 1: FfmpegCommands.BuildRemuxArgv never mapped codec_type=attachment streams, so a font
         // attached for an ASS/SSA subtitle was silently dropped on every remux even with RemoveAttachments off.
-        var fixture = await GenerateFixtureWithAttachmentAsync();
+        var fixture = await fixtures.WithAttachmentAsync();
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
         var sourceAttachment = Assert.Single(Streams(probe, "attachment"));
@@ -422,7 +325,7 @@ public sealed class RealFfmpegTests : IDisposable
     {
         // #547 item 1: the mov,mp4,m4a,3gp,3g2,mj2 muxer family refuses an attachment output stream outright, so
         // mapping "0:t?" for it fails the whole remux; BuildRemuxArgv skips the map for these extensions instead.
-        var fixture = await GenerateFixtureWithAttachmentAsync();
+        var fixture = await fixtures.WithAttachmentAsync();
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
         var config = RemuxRules.DefaultConfig() with { PrimaryAudioLang = "eng", SecondaryAudioLang = string.Empty, TertiaryAudioLang = string.Empty };
@@ -434,9 +337,8 @@ public sealed class RealFfmpegTests : IDisposable
         var argv = FfmpegCommands.BuildRemuxArgv(ffmpeg, fixture, mp4Dst, plan);
         Assert.DoesNotContain("0:t?", argv);
 
-        var result = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = argv, Timeout = TimeSpan.FromMinutes(1) });
+        await RealFfmpegFixtures.RunAsync("The mp4 remux", argv);
 
-        Assert.True(result.ExitCode == 0, "mp4 remux failed: " + ProbeOutput.TailText(result.Stderr));
         var outputProbe = await tools.FfprobeJsonAsync(mp4Dst);
         Assert.Empty(Streams(outputProbe, "attachment"));
     }
@@ -447,20 +349,7 @@ public sealed class RealFfmpegTests : IDisposable
         // #547 item 2: "-disposition:a:N default|0" overwrites the whole disposition, clearing "comment"
         // (and similarly "descriptions", "hearing_impaired", "dub", "original", ...) on a kept track. The
         // additive "+default"/"-default" syntax only ever touches default/forced.
-        var fixture = Path.Combine(_root, "fixture-commentary.mkv");
-        string[] genArgv =
-        [
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
-            "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-            "-map", "0", "-map", "1",
-            "-c:v", "mpeg4", "-c:a", "aac",
-            "-metadata:s:a:0", "language=eng",
-            "-disposition:a:0", "comment",
-            fixture,
-        ];
-        var genResult = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = genArgv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(genResult.ExitCode == 0, "fixture generation failed: " + ProbeOutput.TailText(genResult.Stderr));
+        var fixture = await fixtures.WithCommentaryTrackAsync();
 
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
@@ -496,25 +385,7 @@ public sealed class RealFfmpegTests : IDisposable
     {
         // #547 item 3: DURATION/NUMBER_OF_FRAMES/NUMBER_OF_BYTES/BPS/_STATISTICS_*/ENCODER describe how the
         // *elementary stream* was produced, not this remux, and a plain "-c copy" carries them forward unchanged.
-        var fixture = Path.Combine(_root, "fixture-stale-tags.mkv");
-        string[] genArgv =
-        [
-            RealFfmpeg.Tools!.Value.Ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-f", "lavfi", "-i", "testsrc=duration=3:size=160x120:rate=10",
-            "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-            "-map", "0", "-map", "1",
-            "-c:v", "mpeg4", "-c:a", "aac",
-            "-metadata:s:a:0", "language=eng",
-            "-metadata:s:a:0", "NUMBER_OF_FRAMES=999999",
-            "-metadata:s:a:0", "NUMBER_OF_BYTES=123456789",
-            "-metadata:s:a:0", "BPS=64000",
-            "-metadata:s:a:0", "_STATISTICS_WRITING_APP=FakeTool",
-            "-metadata:s:a:0", "_STATISTICS_WRITING_DATE_UTC=2020-01-01 00:00:00",
-            "-metadata:s:a:0", "_STATISTICS_TAGS=BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES",
-            fixture,
-        ];
-        var genResult = await new ProcessRunner().RunAsync(new ProcessRequest { Argv = genArgv, Timeout = TimeSpan.FromMinutes(1) });
-        Assert.True(genResult.ExitCode == 0, "fixture generation failed: " + ProbeOutput.TailText(genResult.Stderr));
+        var fixture = await fixtures.WithStaleStatisticsTagsAsync();
 
         var tools = Tools();
         var probe = await tools.FfprobeJsonAsync(fixture);
@@ -565,7 +436,7 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task Complete_media_passes_both_validations()
     {
-        var fixture = await GenerateFixtureAsync();
+        var fixture = await fixtures.StandardAsync();
         var tools = Tools();
 
         Assert.Null(await Record.ExceptionAsync(() => tools.ValidateRemuxOutputAsync(fixture, expectedAudio: 2, expectedDurationSeconds: 3.0)));
@@ -575,7 +446,7 @@ public sealed class RealFfmpegTests : IDisposable
     [RequiresFfmpegFact]
     public async Task Output_shorter_than_expected_is_rejected_as_incomplete()
     {
-        var fixture = await GenerateFixtureAsync("short.mkv", "-t", "1");
+        var fixture = await fixtures.ShortAsync();
 
         var error = await Assert.ThrowsAsync<MediaCompletenessException>(() => Tools().ValidateRemuxOutputAsync(fixture, expectedAudio: 2, expectedDurationSeconds: 30.0));
 
@@ -586,7 +457,7 @@ public sealed class RealFfmpegTests : IDisposable
     public async Task A_truncated_download_fails_the_integrity_read()
     {
         // Moov first, so the header survives and only the media data is cut off.
-        var fixture = await GenerateFixtureAsync("fixture.mp4", "-movflags", "+faststart");
+        var fixture = await fixtures.Mp4Async();
         var bytes = await File.ReadAllBytesAsync(fixture);
         var truncated = Path.Combine(_root, "truncated.mp4");
         await File.WriteAllBytesAsync(truncated, bytes[..(bytes.Length / 2)]);
@@ -602,7 +473,7 @@ public sealed class RealFfmpegTests : IDisposable
         // Pinned, not approved: Matroska keeps its duration in the header, so a file cut in half still reports the
         // full length and passes the staged-output check. This is why #539 item 3 checks the *integrity* read
         // (the next test) rather than this one: the header cannot be trusted, only a full demux can.
-        var fixture = await GenerateFixtureAsync();
+        var fixture = await fixtures.StandardAsync();
         var bytes = await File.ReadAllBytesAsync(fixture);
         var truncated = Path.Combine(_root, "truncated.mkv");
         await File.WriteAllBytesAsync(truncated, bytes[..(bytes.Length / 2)]);
@@ -616,7 +487,7 @@ public sealed class RealFfmpegTests : IDisposable
         // #539 item 3: ffmpeg exits 0 from the full demux of a file cut in half, only warning "File ended
         // prematurely", so the exit code alone would call this file complete. ValidateMediaIntegrityAsync treats
         // that warning as failure (Weir.Core.Media.ProbeOutput.IntegrityIncompleteMarkers).
-        var fixture = await GenerateFixtureAsync();
+        var fixture = await fixtures.StandardAsync();
         var bytes = await File.ReadAllBytesAsync(fixture);
         var truncated = Path.Combine(_root, "truncated.mkv");
         await File.WriteAllBytesAsync(truncated, bytes[..(bytes.Length / 2)]);
@@ -680,12 +551,13 @@ public sealed class RealFfmpegTests : IDisposable
             "-re", "-f", "lavfi", "-i", "testsrc=duration=60:size=160x120:rate=10", "-c:v", "mpeg4",
             output,
         ];
-        var before = System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length;
+        using var started = new StartedProcesses();
 
-        var error = await Assert.ThrowsAsync<MediaToolException>(() => Tools().RunFfmpegAsync(argv, timeoutSeconds: 1, progressCallback: _ => { }, durationSeconds: 60));
+        var error = await Assert.ThrowsAsync<MediaToolException>(() => Tools(started).RunFfmpegAsync(argv, timeoutSeconds: 1, progressCallback: _ => { }, durationSeconds: 60));
 
         Assert.Equal("ffmpeg timed out", error.Message);
-        await Eventually.ThatAsync(() => System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length <= before);
+        Assert.Equal(1, started.Count);
+        await started.AllHaveEndedAsync();
     }
 
     /// <summary>
@@ -706,13 +578,14 @@ public sealed class RealFfmpegTests : IDisposable
             "-i", @"\\.\pipe\" + pipeName, "-c", "copy", Path.Combine(_root, "hang.mkv"),
         ];
         var updates = new List<FfmpegProgressUpdate>();
-        var before = System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length;
+        using var started = new StartedProcesses();
 
-        var error = await Assert.ThrowsAsync<MediaToolException>(() => Tools().RunFfmpegAsync(argv, timeoutSeconds: 2, progressCallback: updates.Add));
+        var error = await Assert.ThrowsAsync<MediaToolException>(() => Tools(started).RunFfmpegAsync(argv, timeoutSeconds: 2, progressCallback: updates.Add));
 
         Assert.Equal("ffmpeg timed out", error.Message);
         Assert.Empty(updates);
-        await Eventually.ThatAsync(() => System.Diagnostics.Process.GetProcessesByName("ffmpeg").Length <= before);
+        Assert.Equal(1, started.Count);
+        await started.AllHaveEndedAsync();
     }
 
     private sealed class StaticResolver : IMediaToolResolver

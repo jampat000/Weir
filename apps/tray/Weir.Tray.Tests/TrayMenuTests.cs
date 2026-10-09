@@ -6,7 +6,7 @@ namespace Weir.Tray.Tests;
 /// <summary>The tray menu: what it holds, in what order and words, and which items are enabled in each state (docs/tray-standard.md).</summary>
 public sealed class TrayMenuTests
 {
-    private static readonly TrayStatus AllWell = new(false, null, 0, [], true);
+    private static readonly TrayStatus AllWell = new(false, null, [], [], true);
     private static readonly UpdateMenuState CheckForUpdates = new("Check for updates", true, UpdateMenuAction.Check);
     private static readonly LanAccessMenuState LanIdle = LanAccessMenuState.Describe(ListenScope.ThisPcOnly, LanAccessActivity.Idle);
 
@@ -36,7 +36,7 @@ public sealed class TrayMenuTests
         Assert.Equal(
             [
                 "Open Weir",
-                "Running at http://localhost:9347",
+                "Weir - Running at http://localhost:9347",
                 "---",
                 "Pause processing",
                 "Restart Weir",
@@ -88,10 +88,33 @@ public sealed class TrayMenuTests
     [Fact]
     public void The_status_line_has_the_same_words_as_the_hover_text()
     {
-        var server = AllWell with { Paused = true, FilesNeedingYou = 2 };
+        var server = AllWell with { Paused = true, ManagersUnreachable = ["Deluno"] };
         var state = new TrayState(ServerPhase.Running, server, null, 9347);
 
-        Assert.Equal(state.StatusLine, Item(Menu(server: server), TrayMenuItem.Status).Text);
+        Assert.Equal(state.HoverText, Item(Menu(server: server), TrayMenuItem.Status).Text);
+        Assert.StartsWith("Weir - Paused - Deluno isn't answering", Item(Menu(server: server), TrayMenuItem.Status).Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_status_line_starts_with_the_product_name_in_every_state()
+    {
+        var states = new[]
+        {
+            new TrayState(ServerPhase.Running, AllWell, null, 9347),
+            new TrayState(ServerPhase.Running, AllWell, "1.0.0", 9347),
+            new TrayState(ServerPhase.Running, AllWell with { ManagersUnreachable = ["Deluno"] }, null, 9347),
+            new TrayState(ServerPhase.Running, AllWell with { FoldersUnreachable = ["The watched folder for Movies"] }, null, 9347),
+            new TrayState(ServerPhase.Starting, null, null, 9347),
+            new TrayState(ServerPhase.Stopped, null, null, 9347),
+        };
+
+        foreach (var state in states)
+        {
+            var text = Item(Menu(phase: state.Phase, server: state.Server, update: state.UpdateVersion), TrayMenuItem.Status).Text;
+
+            Assert.Equal(state.HoverText, text);
+            Assert.StartsWith("Weir - ", text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -140,7 +163,7 @@ public sealed class TrayMenuTests
     [Fact]
     public void A_stopped_server_says_so_in_the_status_line()
     {
-        Assert.Equal("Stopped - choose Restart Weir", Item(Menu(ServerPhase.Stopped), TrayMenuItem.Status).Text);
+        Assert.Equal("Weir - Stopped - choose Restart Weir", Item(Menu(ServerPhase.Stopped), TrayMenuItem.Status).Text);
     }
 
     [Fact]

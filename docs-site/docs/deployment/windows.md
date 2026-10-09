@@ -35,7 +35,7 @@ Weir runs in the user session, not as a Windows service. This avoids common NAS 
 
 The tray app (`Weir.exe`) starts the Weir server (`server\WeirServer.exe`, a self-contained .NET program) as a child process with `--port <port>`, listening for this PC only unless [LAN access](#firewall-and-lan-access) is on. It watches the server and restarts it if it stops unexpectedly. The server creates or updates its SQLite database itself when it starts.
 
-The tray icon carries a small mark in its corner only when something is different: a grey ring while Weir starts, two bars while processing is paused, a red dot when something needs you (Weir stopped, a connected media manager such as Deluno cannot be reached, or files are on hold or failed), a blue dot when a downloaded update is waiting. One mark shows at a time, in that order of priority. Hover over the icon for the state in words. The menu follows the tray standard Weir and Deluno share (`docs/tray-standard.md` in the repository):
+The tray icon carries a dot in its bottom-right corner that shows the health of Weir and of what it is set up to talk to: green when Weir is running and everything answers, amber when it is running but a connected media manager such as Deluno, or a workflow's watched, work or output folder, does not answer, red when Weir has stopped or keeps failing to start, and blinking while it starts. The dot never reflects files or downloads. Two extra marks sit in the opposite corner: two bars while processing is paused, and a blue arrow when a downloaded update is waiting; the bars show when both apply. Hover over the icon for the state in words; when the dot is amber or red, it says what is wrong. The menu follows the tray standard Weir and Deluno share (`docs/tray-standard.md` in the repository):
 - **Open Weir** — opens the web UI in your browser (so does clicking the icon); below it, a greyed line with the state
 - **Pause processing** / **Resume processing** — stops or restarts new processing work
 - **Restart Weir** — stops the server cleanly and starts it again on the same port; also the way back if Weir stopped and could not start again by itself
@@ -242,7 +242,10 @@ still pass it.
 ## Starting with Windows
 
 Weir does not start with Windows until you say so. The first time Weir starts it asks "Start Weir when you sign
-in to Windows?"; a silent install (`--silent`) never asks and leaves it off. The **Start with Windows** tick in the
+in to Windows?"; a silent install (`--silent`) never asks and leaves it off. Versions up to 1.0.0-rc.10 registered it at install
+without asking. If Weir finds such an entry and no answer has been recorded (an answer is recorded when you answer the
+question or tick or untick the menu item), it asks once, after its icon is up, the next time you start Weir yourself (not at
+sign-in, not during a silent start): Yes keeps the entry, No removes it. The **Start with Windows** tick in the
 tray menu shows the current choice and switches it at any time. When it is on, Weir has a `Weir` entry under
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. That start passes `--no-browser`, so signing in doesn't open
 a browser window. If there is a `Weir.lnk` shortcut in your Startup folder, turning it on removes it so there is only

@@ -2,11 +2,12 @@ import { useState } from "react";
 import { ChooseTracksPanel } from "../../components/processing/choose-tracks-panel";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { errorMessage } from "../../lib/api/error-message";
-import type {
-  ProcessingFile,
-  ProcessingFileStatus,
-  ProcessingFileTracks,
-  ProcessingManualPlanChoice,
+import {
+  wasRemovedBelowMinimumSize,
+  type ProcessingFile,
+  type ProcessingFileStatus,
+  type ProcessingFileTracks,
+  type ProcessingManualPlanChoice,
 } from "../../lib/processing/files-api";
 import {
   useMoveProcessingFileToTop,
@@ -135,6 +136,10 @@ export function ActivityFileActions({
   }
 
   const status = file.status;
+  // A file Weir has found gone, or one the workflow removed for being under its minimum size, has nothing left to choose tracks
+  // for, check again, process or pass through: only forgetting it is left.
+  const hasFile =
+    file.source_gone !== true && !wasRemovedBelowMinimumSize(file);
   const queueAgain = () =>
     void run(
       async () => (await requeue.mutateAsync(file.id)).detail,
@@ -175,7 +180,7 @@ export function ActivityFileActions({
               { pending: requeue.isPending, pendingLabel: "Queueing…" },
             )
           : null}
-        {CONCLUDED.includes(status)
+        {CONCLUDED.includes(status) && hasFile
           ? button(
               "Process again",
               "Queues this file to be processed again, from its original in the watched folder.",
@@ -215,7 +220,7 @@ export function ActivityFileActions({
               },
             )
           : null}
-        {status === "on_hold"
+        {status === "on_hold" && hasFile
           ? button(
               "Choose tracks",
               "Reads this file's tracks again and lets you pick which to keep, instead of the saved rules.",
@@ -224,6 +229,7 @@ export function ActivityFileActions({
           : null}
         {/* Weir never scans a workflow a media manager hands its downloads to, so there is nothing to check again. */}
         {handedOff === null &&
+        hasFile &&
         (status === "on_hold" ||
           status === "blocked_upstream" ||
           status === "skipped" ||
@@ -242,7 +248,7 @@ export function ActivityFileActions({
               { pending: checkAgain.isPending, pendingLabel: "Checking…" },
             )
           : null}
-        {status === "blocked_upstream" || status === "on_hold"
+        {(status === "blocked_upstream" || status === "on_hold") && hasFile
           ? button(
               "Why is this held?",
               "Asks every media manager covering this workflow what it is doing with this file, right now.",
@@ -262,7 +268,8 @@ export function ActivityFileActions({
           : null}
         {status !== "processing" &&
         status !== "processed" &&
-        status !== "disabled"
+        status !== "disabled" &&
+        hasFile
           ? button(
               "Pass through unchanged",
               "Skips your track rules, places a checked, unchanged copy in the output folder, then tidies the original as after any finished file.",

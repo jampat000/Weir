@@ -1,7 +1,8 @@
 namespace Weir.Core.Processing;
 
 /// <summary>A status and the sentence that explains it.</summary>
-public sealed record FileStateVerdict(string Status, string Reason, string? BlockedByConnection = null, DateTimeOffset? HoldUntil = null)
+public sealed record FileStateVerdict(
+    string Status, string Reason, string? BlockedByConnection = null, DateTimeOffset? HoldUntil = null, string? SkipKind = null)
 {
     public bool Eligible => Status == ProcessingFileStatuses.Unprocessed;
 }

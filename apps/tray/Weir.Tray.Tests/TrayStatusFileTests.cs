@@ -25,7 +25,7 @@ public sealed class TrayStatusFileTests : IDisposable
             {
               "paused": true,
               "paused_until": "2026-10-09T18:30:00+00:00",
-              "needs_you": { "files": 2, "managers_unreachable": ["Deluno", "Sonarr"] },
+              "unreachable": { "managers": ["Deluno", "Sonarr"], "folders": ["The watched folder for Movies"] },
               "server_ok": true
             }
             """);
@@ -35,8 +35,8 @@ public sealed class TrayStatusFileTests : IDisposable
         Assert.NotNull(status);
         Assert.True(status.Paused);
         Assert.Equal(new DateTimeOffset(2026, 10, 9, 18, 30, 0, TimeSpan.Zero), status.PausedUntil);
-        Assert.Equal(2, status.FilesNeedingYou);
         Assert.Equal(["Deluno", "Sonarr"], status.ManagersUnreachable);
+        Assert.Equal(["The watched folder for Movies"], status.FoldersUnreachable);
         Assert.True(status.ServerOk);
         Assert.Empty(_log);
     }
@@ -55,16 +55,37 @@ public sealed class TrayStatusFileTests : IDisposable
     }
 
     [Fact]
-    public void A_status_with_nothing_wrong_needs_nothing()
+    public void A_status_with_nothing_wrong_has_nothing_not_answering()
     {
-        Write("""{ "paused": false, "paused_until": null, "needs_you": { "files": 0, "managers_unreachable": [] }, "server_ok": true }""");
+        Write("""{ "paused": false, "paused_until": null, "unreachable": { "managers": [], "folders": [] }, "server_ok": true }""");
 
         var status = Read();
 
         Assert.NotNull(status);
         Assert.False(status.Paused);
         Assert.Null(status.PausedUntil);
-        Assert.False(status.NeedsYou);
+        Assert.False(status.SomethingNotAnswering);
+    }
+
+    [Fact]
+    public void A_manager_or_a_folder_that_does_not_answer_is_something_not_answering()
+    {
+        Write("""{ "unreachable": { "managers": ["Deluno"] } }""");
+        Assert.True(Read()!.SomethingNotAnswering);
+
+        Write("""{ "unreachable": { "folders": ["The output folder for Movies"] } }""");
+        Assert.True(Read()!.SomethingNotAnswering);
+    }
+
+    [Fact]
+    public void A_count_of_files_in_the_file_is_not_read()
+    {
+        Write("""{ "needs_you": { "files": 5, "managers_unreachable": ["Deluno"] }, "unreachable": { "files": 7 } }""");
+
+        var status = Read()!;
+
+        Assert.False(status.SomethingNotAnswering);
+        Assert.DoesNotContain(typeof(TrayStatus).GetProperties(), property => property.Name.Contains("File", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -83,7 +104,7 @@ public sealed class TrayStatusFileTests : IDisposable
     [InlineData("{ \"paused\": ")]
     [InlineData("[]")]
     [InlineData("{ \"paused\": \"yes\" }")]
-    [InlineData("{ \"needs_you\": { \"files\": \"many\" } }")]
+    [InlineData("{ \"unreachable\": { \"managers\": \"Deluno\" } }")]
     public void A_file_that_cannot_be_understood_is_unreadable_and_says_why_in_the_log(string contents)
     {
         Write(contents);
@@ -128,27 +149,27 @@ public sealed class TrayStatusFileTests : IDisposable
 
         Assert.NotNull(status);
         Assert.False(status.Paused);
-        Assert.Equal(0, status.FilesNeedingYou);
         Assert.Empty(status.ManagersUnreachable);
+        Assert.Empty(status.FoldersUnreachable);
         Assert.True(status.ServerOk);
     }
 
     [Fact]
-    public void A_server_that_says_it_is_not_well_needs_the_person()
+    public void A_server_that_says_it_is_not_well_is_read_as_not_ok()
     {
         Write("""{ "server_ok": false }""");
 
-        Assert.True(Read()!.NeedsYou);
+        Assert.False(Read()!.ServerOk);
     }
 
     [Fact]
     public void Odd_values_are_tidied_not_trusted()
     {
-        Write("""{ "needs_you": { "files": -3, "managers_unreachable": ["  Deluno ", "", "   "] } }""");
+        Write("""{ "unreachable": { "managers": ["  Deluno ", "", "   "], "folders": [" The work folder for Shows", " "] } }""");
 
         var status = Read()!;
 
-        Assert.Equal(0, status.FilesNeedingYou);
         Assert.Equal(["Deluno"], status.ManagersUnreachable);
+        Assert.Equal(["The work folder for Shows"], status.FoldersUnreachable);
     }
 }

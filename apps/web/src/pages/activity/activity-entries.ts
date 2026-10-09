@@ -1,6 +1,7 @@
-import type {
-  ProcessingFile,
-  ProcessingFileStatus,
+import {
+  isBelowMinimumSize,
+  type ProcessingFile,
+  type ProcessingFileStatus,
 } from "../../lib/processing/files-api";
 import type { LibraryClean } from "../../lib/processing/library-cleans-api";
 import type { WorkflowKind } from "../../lib/processing/workflow-kind";
@@ -152,8 +153,9 @@ export function activityGroupOf(file: ProcessingFile): ActivityGroup | null {
 const SKIPPED_BY_RULE = /^skipped because/i;
 
 /**
- * Whether a file waits on a person: a failure, a rejection, a hold with no clock on it, or a skip by a rule. The server counts
- * the same files for the tray (`FileStateStore.CountWaitingOnPersonAsync`), so change both together.
+ * Whether a file waits on a person: a failure, a rejection, a hold with no clock on it, or a skip by a rule. A file under the
+ * workflow's minimum size is left out: the minimum is doing its job, skipping samples and extras. The badge, Needs you panel
+ * and Activity chip count the same files.
  */
 export function waitsOnAPerson(file: ProcessingFile): boolean {
   switch (file.status) {
@@ -163,7 +165,9 @@ export function waitsOnAPerson(file: ProcessingFile): boolean {
     case "on_hold":
       return !file.hold_until;
     case "skipped":
-      return SKIPPED_BY_RULE.test(file.status_reason);
+      return (
+        SKIPPED_BY_RULE.test(file.status_reason) && !isBelowMinimumSize(file)
+      );
     default:
       return false;
   }

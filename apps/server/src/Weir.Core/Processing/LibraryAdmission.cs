@@ -47,7 +47,8 @@ public sealed record LibraryAdmissionRules(
 /// <summary>A settled file the library rules refuse, and the counter it moves.</summary>
 /// <param name="Reason">The plain-language reason recorded for the file.</param>
 /// <param name="Counter">The summary counter this rejection moves.</param>
-public sealed record LibraryAdmissionRejection(string Reason, string Counter);
+/// <param name="SkipKind">The code for why the file is skipped (<see cref="SkipKinds"/>), when the reason has one.</param>
+public sealed record LibraryAdmissionRejection(string Reason, string Counter, string? SkipKind = null);
 
 /// <summary>Facts about one candidate file needed by the admission rejection check, independent of how
 /// they were read from disk.</summary>
@@ -73,7 +74,8 @@ public static class LibraryAdmission
         {
             return new LibraryAdmissionRejection(
                 BelowMinimumSizeReason(sizeMb, rules.MinFileSizeMb),
-                "skipped_below_minimum_file_size");
+                "skipped_below_minimum_file_size",
+                SkipKinds.BelowMinimumSize);
         }
 
         if (rules.MaxFileSizeMb > 0 && facts.SizeBytes > rules.MaxFileSizeMb * 1024 * 1024)

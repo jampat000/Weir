@@ -2,16 +2,21 @@ using System.Text.Json;
 
 namespace Weir.Tray;
 
-/// <summary>What the server says about itself for the tray: whether processing is paused, what waits on the person.</summary>
+/// <summary>What the server says about itself for the tray: whether processing is paused, and what it relies on that does not answer.</summary>
+/// <param name="Paused">Processing is paused right now.</param>
+/// <param name="PausedUntil">When a timed pause ends, or null.</param>
+/// <param name="ManagersUnreachable">The media managers (Deluno, Sonarr, Radarr) that do not answer, by name.</param>
+/// <param name="FoldersUnreachable">The watched, work and output folders Weir cannot reach, each in the words the tray shows.</param>
+/// <param name="ServerOk">False once the server has said it is stopping.</param>
 sealed record TrayStatus(
     bool Paused,
     DateTimeOffset? PausedUntil,
-    int FilesNeedingYou,
     IReadOnlyList<string> ManagersUnreachable,
+    IReadOnlyList<string> FoldersUnreachable,
     bool ServerOk)
 {
-    /// <summary>Whether anything in this status needs the person: files waiting on them, a manager out of reach, a sick server.</summary>
-    internal bool NeedsYou => !ServerOk || FilesNeedingYou > 0 || ManagersUnreachable.Count > 0;
+    /// <summary>Whether the server is running but something it relies on does not answer.</summary>
+    internal bool SomethingNotAnswering => ManagersUnreachable.Count > 0 || FoldersUnreachable.Count > 0;
 }
 
 /// <summary>One look at tray-status.json: what it held and when the server wrote it.</summary>
@@ -27,7 +32,7 @@ readonly record struct TrayStatusReading(TrayStatus? Status, DateTime? WrittenAt
 
 /// <summary>
 /// tray-status.json in the runtime home, written by the server (atomically, whenever its content changes) for the tray
-/// to show: the paused state and what needs the person. A file, like work-state.json, because the tray has no signed-in
+/// to show: the paused state and what does not answer. A file, like work-state.json, because the tray has no signed-in
 /// session and the server should have no route that answers without one.
 /// </summary>
 static class TrayStatusFile
@@ -62,25 +67,20 @@ static class TrayStatusFile
         }
     }
 
-    private static TrayStatus? Parse(Wire? wire)
-    {
-        if (wire is null)
-        {
-            return null;
-        }
-        var managers = (wire.NeedsYou?.ManagersUnreachable ?? [])
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Select(name => name.Trim())
-            .ToList();
-        return new TrayStatus(
-            wire.Paused ?? false,
-            wire.PausedUntil,
-            Math.Max(0, wire.NeedsYou?.Files ?? 0),
-            managers,
-            wire.ServerOk ?? true);
-    }
+    private static TrayStatus? Parse(Wire? wire) =>
+        wire is null
+            ? null
+            : new TrayStatus(
+                wire.Paused ?? false,
+                wire.PausedUntil,
+                Names(wire.Unreachable?.Managers),
+                Names(wire.Unreachable?.Folders),
+                wire.ServerOk ?? true);
 
-    private sealed record Wire(bool? Paused, DateTimeOffset? PausedUntil, WireNeedsYou? NeedsYou, bool? ServerOk);
+    private static List<string> Names(List<string>? names) =>
+        [.. (names ?? []).Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Trim())];
 
-    private sealed record WireNeedsYou(int? Files, List<string>? ManagersUnreachable);
+    private sealed record Wire(bool? Paused, DateTimeOffset? PausedUntil, WireUnreachable? Unreachable, bool? ServerOk);
+
+    private sealed record WireUnreachable(List<string>? Managers, List<string>? Folders);
 }

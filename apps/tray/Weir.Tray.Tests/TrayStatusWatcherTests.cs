@@ -57,7 +57,7 @@ public sealed class TrayStatusWatcherTests : IDisposable
     }
 
     private static TrayStatusReading Reading(bool paused) =>
-        new(new TrayStatus(paused, null, 0, [], true), DateTime.UtcNow, Failed: false);
+        new(new TrayStatus(paused, null, [], [], true), DateTime.UtcNow, Failed: false);
 
     [Fact]
     public void Starting_reports_a_file_that_is_already_there()
@@ -83,7 +83,7 @@ public sealed class TrayStatusWatcherTests : IDisposable
         using var watcher = StartWatching();
         Assert.Null(NextHeard().Status);
 
-        AtomicFile.WriteAllText(_home.Path, TrayStatusFile.FileName, """{ "paused": true, "needs_you": { "files": 3 } }""");
+        AtomicFile.WriteAllText(_home.Path, TrayStatusFile.FileName, """{ "paused": true, "unreachable": { "managers": ["Deluno"] } }""");
 
         var latest = NextHeard();
         while (latest.Status is null)
@@ -91,7 +91,7 @@ public sealed class TrayStatusWatcherTests : IDisposable
             latest = NextHeard();
         }
         Assert.True(latest.Status.Paused);
-        Assert.Equal(3, latest.Status.FilesNeedingYou);
+        Assert.Equal(["Deluno"], latest.Status.ManagersUnreachable);
     }
 
     [Fact]
@@ -100,17 +100,18 @@ public sealed class TrayStatusWatcherTests : IDisposable
         using var watcher = StartWatching();
         Assert.Null(NextHeard().Status);
 
-        for (var files = 1; files <= 5; files++)
+        for (var managers = 1; managers <= 5; managers++)
         {
-            AtomicFile.WriteAllText(_home.Path, TrayStatusFile.FileName, $$"""{ "needs_you": { "files": {{files}} } }""");
+            var names = string.Join(", ", Enumerable.Range(1, managers).Select(n => $"\"M{n}\""));
+            AtomicFile.WriteAllText(_home.Path, TrayStatusFile.FileName, $$"""{ "unreachable": { "managers": [{{names}}] } }""");
         }
 
         var last = NextHeard();
-        while (last.Status is not { FilesNeedingYou: 5 })
+        while (last.Status is not { ManagersUnreachable.Count: 5 })
         {
             last = NextHeard();
         }
-        Assert.Equal(5, last.Status.FilesNeedingYou);
+        Assert.Equal(5, last.Status.ManagersUnreachable.Count);
     }
 
     [Fact]

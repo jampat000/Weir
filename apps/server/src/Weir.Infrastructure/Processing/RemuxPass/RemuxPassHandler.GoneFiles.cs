@@ -28,6 +28,21 @@ public sealed partial class RemuxPassHandler
     }
 
     /// <summary>
+    /// Whether this look adds an entry to Activity. A file is recorded as gone once: not by the look that forgets it, which is the
+    /// second, and not by a look at a file that was already held as gone when the pass claimed it, which something else recorded.
+    /// The manager that handed the file over is still told at the final look.
+    /// </summary>
+    private static bool AddsGoneEntry(WireObject result, bool listedWhenClaimed)
+    {
+        if (result.Get("outcome") is not WireString { Value: RemuxPassOutcomes.SourceGone })
+        {
+            return true;
+        }
+
+        return !listedWhenClaimed && !(result.Get(GoneLooksKey) is WireInteger { Value: var looks } && looks > 0);
+    }
+
+    /// <summary>
     /// The first time a file is found gone it is held, not forgotten: its attempts, reason and any hand-picked plan stay until it is
     /// plain that it is not coming back. A look is booked for after the scan's own grace for a vanished file
     /// (<see cref="GoneSources.LookAgainAfter"/>). That look finds the file back, and processes it, or still gone, and forgets it and

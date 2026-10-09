@@ -174,7 +174,8 @@ public sealed partial class RemuxPassHandler
     private static async Task RecordGuardrailSkipAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject result, WireObject updates, DateTimeOffset now)
     {
         var reason = WireStrings.Slice(CollapseWhitespace(TextOr(result.Get("reason"), "Weir skipped this file.")), 1200);
-        if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, relativePath, ProcessingFileStatuses.Skipped, reason, now).ConfigureAwait(false))
+        var skipKind = result.Get("skip_kind") is WireString { Value.Length: > 0 } kind ? kind.Value : null;
+        if (await RemuxPassFileState.MarkFileStatusAsync(uow, library.Id, relativePath, ProcessingFileStatuses.Skipped, reason, now, skipKind).ConfigureAwait(false))
         {
             await RemuxPassFileState.ClearFailureFieldsAsync(uow, library.Id, relativePath).ConfigureAwait(false);
         }

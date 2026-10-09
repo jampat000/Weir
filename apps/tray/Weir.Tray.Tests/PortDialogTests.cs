@@ -29,6 +29,43 @@ public sealed class PortDialogTests
     }
 
     [Fact]
+    public void A_question_from_start_up_has_a_taskbar_button_and_is_top_most_but_the_one_from_the_menu_is_not()
+    {
+        OnSta(() =>
+        {
+            foreach (var reason in new[] { PortPromptReason.FirstRun, PortPromptReason.SavedPortBusy })
+            {
+                using var startUp = new PortDialog(new PortPrompt(reason, 9347, false, 9347), Busy(), null);
+
+                Assert.True(startUp.MustBeSeen, reason.ToString());
+                Assert.True(startUp.ShowInTaskbar, reason.ToString());
+                Assert.True(startUp.TopMost, reason.ToString());
+            }
+
+            using var menu = new PortDialog(new PortPrompt(PortPromptReason.Change, 9347, false, 9347), Busy(), null);
+
+            Assert.False(menu.MustBeSeen);
+            Assert.False(menu.ShowInTaskbar);
+            Assert.False(menu.TopMost);
+        });
+    }
+
+    [Fact]
+    public void Once_shown_the_first_run_window_is_top_most_as_Windows_sees_it()
+    {
+        OnSta(() =>
+        {
+            using var dialog = new PortDialog(new PortPrompt(PortPromptReason.FirstRun, 9347, false, 9347), Busy(), null);
+
+            dialog.Show();
+            Application.DoEvents();
+
+            Assert.True(ForegroundWindow.IsTopMost(dialog));
+            dialog.Close();
+        });
+    }
+
+    [Fact]
     public void First_run_with_the_default_free_starts_on_the_default()
     {
         OnSta(() =>

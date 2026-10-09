@@ -85,11 +85,11 @@ internal sealed class WatchedFolderScanRun
     {
         foreach (var removal in _removals)
         {
-            var (_, detail) = RemuxPassPaths.CleanupRejectedFile(_scan.Paths.WatchedFolder, removal.FilePath, removal.Action);
+            var (deleted, detail) = RemuxPassPaths.CleanupRejectedFile(_scan.Paths.WatchedFolder, removal.FilePath, removal.Action);
             var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
             await using (uow.ConfigureAwait(false))
             {
-                await _files.MarkFileStatusAsync(uow, _scan.Library.Id, removal.RelativePath, ProcessingFileStatuses.Skipped, $"{removal.Reason} {detail}")
+                await _files.MarkFileStatusAsync(uow, _scan.Library.Id, removal.RelativePath, ProcessingFileStatuses.Skipped, $"{removal.Reason} {detail}", deleted ? SkipKinds.AfterRemoval(removal.SkipKind) : removal.SkipKind)
                     .ConfigureAwait(false);
                 await uow.CommitAsync().ConfigureAwait(false);
             }

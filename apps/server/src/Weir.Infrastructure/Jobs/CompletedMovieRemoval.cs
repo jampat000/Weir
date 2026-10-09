@@ -1,4 +1,5 @@
 using Weir.Core.Processing;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
 
@@ -50,7 +51,7 @@ internal static class CompletedMovieRemoval
     }
 
     /// <summary>Every other file Weir listed in the removed release folder went with it.</summary>
-    private static async Task MarkReleaseFolderProcessedAsync(UnitOfWork uow, long libraryId, string rel)
+    internal static async Task MarkReleaseFolderProcessedAsync(UnitOfWork uow, long libraryId, string rel)
     {
         var releaseParent = PosixParent(rel);
         var rows = await uow.QueryAsync(
@@ -65,6 +66,9 @@ internal static class CompletedMovieRemoval
                 ("@reason", "Weir removed this file with its release folder after the validated movie output completed. No separate output was created for this extra file."),
                 ("@id", id)).ConfigureAwait(false);
         }
+
+        // No Activity row records this, so the lists that show these files are told once the rows commit.
+        ActivityNotifications.TrackFileListChange(uow);
     }
 
     private static string PosixParent(string relativePosix)

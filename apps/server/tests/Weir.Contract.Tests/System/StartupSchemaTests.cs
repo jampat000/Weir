@@ -106,6 +106,8 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
             // A real database at that revision has none of what later migrations added; take those back out, or the upgrade
             // would add them a second time.
             SeedSql.Execute(stopped.Connection, "ALTER TABLE media_manager_handoff_targets DROP COLUMN output_written_at");
+            SeedSql.Execute(stopped.Connection, "ALTER TABLE files DROP COLUMN skip_kind");
+            SeedSql.Execute(stopped.Connection, "DROP INDEX ix_activity_events_current");
             Assert.DoesNotContain("schema_version", Tables(stopped.Connection));
         }
 

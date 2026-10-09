@@ -105,6 +105,59 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
 
     [Trait("Category", "Integration")]
     [Fact]
+    public async Task Several_files_deleted_from_a_watched_folder_queue_one_scan_so_files_that_left_are_found()
+    {
+        using var store = new StoreFixture(
+            ("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-3"),
+            ("WEIR_PROCESSING_WATCHER_DEBOUNCE_SECONDS", "1"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        var files = Enumerable.Range(1, 6).Select(index => Path.Combine(watched, $"Gate Test {index}.mkv")).ToList();
+        foreach (var file in files)
+        {
+            await File.WriteAllBytesAsync(file, new byte[2048]);
+        }
+
+        var libraryId = await CreateLibraryAsync(store, watched, output);
+
+        // The debounce clock is fake, as in the growing-file test, so a slow machine cannot straddle a real second between deletes.
+        var time = new FakeTimeProvider();
+        var state = new WatcherStateStore();
+        var service = Service(store, state, time);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually.ThatAsync(() => state.Reports().Any(r => r.LibraryId == libraryId && r.Status == WatcherStatus.Watching));
+            foreach (var file in files)
+            {
+                File.Delete(file);
+            }
+
+            await Eventually.ThatAsync(
+                () =>
+                {
+                    time.Advance(ProcessingWatchedFolderWatcherService.TickInterval);
+                    return ScanJobPayloads(store).Count > 0;
+                },
+                TimeSpan.FromSeconds(5));
+            for (var tick = 0; tick < 6; tick++)
+            {
+                time.Advance(ProcessingWatchedFolderWatcherService.TickInterval);
+                await Task.Delay(100);
+            }
+
+            Assert.Single(ScanJobPayloads(store));
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Trait("Category", "Integration")]
+    [Fact]
     public async Task A_file_moved_into_a_watched_folder_becomes_a_candidate()
     {
         // The common shape: a download client writes elsewhere and moves the finished file in.

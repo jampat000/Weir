@@ -39,7 +39,7 @@ public static class RemuxPassFileState
     }
 
     /// <summary>Moves a file Weir has already seen into a new state. False when there is no row.</summary>
-    public static async Task<bool> MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason, DateTimeOffset now)
+    public static async Task<bool> MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason, DateTimeOffset now, string? skipKind = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         var row = await FindAsync(uow, libraryId, relativePath).ConfigureAwait(false);
@@ -48,7 +48,7 @@ public static class RemuxPassFileState
             return false;
         }
 
-        var sets = new List<string> { "status = $status", "status_reason = $reason", "updated_at = CURRENT_TIMESTAMP" };
+        var sets = new List<string> { "status = $status", "status_reason = $reason", "skip_kind = $skip_kind", "updated_at = CURRENT_TIMESTAMP" };
         if (status is ProcessingFileStatuses.Processing or ProcessingFileStatuses.Processed or ProcessingFileStatuses.ProcessingFailed)
         {
             sets.Add("last_attempt_at = $now");
@@ -68,6 +68,7 @@ public static class RemuxPassFileState
             $"UPDATE files SET {string.Join(", ", sets)} WHERE id = $id",
             ("$status", status),
             ("$reason", reason),
+            ("$skip_kind", skipKind),
             ("$now", TimestampColumns.Orm(now)),
             ("$id", row.Id)).ConfigureAwait(false);
         return true;
@@ -89,12 +90,14 @@ public static class RemuxPassFileState
     /// <summary>
     /// A file that was not there when its pass looked: held, with its reason, attempts and any hand-picked plan intact, until
     /// <paramref name="holdUntil"/>. It might be a share that dropped for a moment. Only a file without an outcome changes; one that
-    /// is processed, passed through, rejected or skipped stays as history whether or not its original is still there.
+    /// is processed, passed through, rejected or skipped stays as history whether or not its original is still there. False when the
+    /// file was already held for being gone, so a caller that says so does not say it twice.
     /// </summary>
-    public static Task HoldGoneAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset holdUntil)
+    public static async Task<bool> HoldGoneAsync(UnitOfWork uow, long libraryId, string relativePath, DateTimeOffset holdUntil)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        return uow.ExecuteAsync(
+        var alreadyHeld = await IsHeldAsGoneAsync(uow, libraryId, relativePath).ConfigureAwait(false);
+        await uow.ExecuteAsync(
             $"UPDATE files SET status = $status, status_reason = $reason, hold_until = $until, updated_at = CURRENT_TIMESTAMP " +
             $"WHERE library_id = $library AND relative_path = $path AND status IN ({UnfinishedStatuses})",
             [
@@ -104,7 +107,22 @@ public static class RemuxPassFileState
                 ("$library", libraryId),
                 ("$path", relativePath),
                 .. UnfinishedStatusParameters(),
-            ]);
+            ]).ConfigureAwait(false);
+        return !alreadyHeld;
+    }
+
+    /// <summary>Whether the file is held for being gone, which means it has been recorded as no longer there.</summary>
+    public static async Task<bool> IsHeldAsGoneAsync(UnitOfWork uow, long libraryId, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(uow);
+        var held = await uow.QueryAsync(
+            "SELECT 1 FROM files WHERE library_id = $library AND relative_path = $path AND status = $status AND status_reason = $reason LIMIT 1",
+            reader => reader.GetInt64(0),
+            ("$library", libraryId),
+            ("$path", relativePath),
+            ("$status", ProcessingFileStatuses.OnHold),
+            ("$reason", GoneSourceText.HeldReason)).ConfigureAwait(false);
+        return held.Count > 0;
     }
 
     /// <summary>
