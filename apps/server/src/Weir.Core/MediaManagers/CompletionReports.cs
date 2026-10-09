@@ -1,5 +1,6 @@
 using Weir.Core.Json;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Core.Text;
 
 namespace Weir.Core.MediaManagers;
@@ -59,6 +60,18 @@ public static class CompletionReports
 
     private static readonly HashSet<string> SuccessOutcomes = new(StringComparer.Ordinal) { "live_output_written", "live_skipped_not_required" };
 
+    /// <summary>The <c>failureClass</c> of a report for a download that is no longer where the manager put it.</summary>
+    public const string SourceGoneFailureClass = "source_gone";
+
+    public const string SourceGoneMessage = "The download is no longer there, so Weir had nothing to do.";
+
+    /// <summary>A pass that ended because its file left the watched folder (and stayed gone).</summary>
+    public static bool IsSourceGone(WireObject result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return Outcome(result) == RemuxPassOutcomes.SourceGone;
+    }
+
     private static string Outcome(WireObject result) =>
         WireStrings.Strip(result.Get("outcome") is { IsTruthy: true } value ? WireConvert.Str(value) : string.Empty);
 
@@ -95,24 +108,33 @@ public static class CompletionReports
         else
         {
             body.Set("message", MessageFor(result));
-            if (rejected)
+            if (IsSourceGone(result))
             {
-                body.Set("disposition", "rejected");
-                body.Set("sourceRemoved", sourceRemoved);
-            }
-            else if (result.Get("rejected_cleanup_status") is WireString { Value: "deleted" })
-            {
-                body.Set("sourceRemoved", true);
+                // The one report with no disposition: the download left the watched folder, so there is nothing to hold or reject.
+                body.Set("sourceRemoved", false);
+                body.Set("failureClass", SourceGoneFailureClass);
             }
             else
             {
-                body.Set("disposition", "held");
-                body.Set("sourceRemoved", false);
-            }
+                if (rejected)
+                {
+                    body.Set("disposition", "rejected");
+                    body.Set("sourceRemoved", sourceRemoved);
+                }
+                else if (result.Get("rejected_cleanup_status") is WireString { Value: "deleted" })
+                {
+                    body.Set("sourceRemoved", true);
+                }
+                else
+                {
+                    body.Set("disposition", "held");
+                    body.Set("sourceRemoved", false);
+                }
 
-            if (result.Get("failure_class") is WireString failureClass && WireStrings.Strip(failureClass.Value).Length > 0)
-            {
-                body.Set("failureClass", WireStrings.Strip(failureClass.Value));
+                if (result.Get("failure_class") is WireString failureClass && WireStrings.Strip(failureClass.Value).Length > 0)
+                {
+                    body.Set("failureClass", WireStrings.Strip(failureClass.Value));
+                }
             }
         }
 
@@ -144,7 +166,7 @@ public static class CompletionReports
     public static string MessageFor(WireObject result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return IsSucceeded(result) ? SuccessMessage(Outcome(result), result) : FailureMessage(result);
+        return IsSucceeded(result) ? SuccessMessage(Outcome(result), result) : IsSourceGone(result) ? SourceGoneMessage : FailureMessage(result);
     }
 
     private static string SuccessMessage(string outcome, WireObject result)

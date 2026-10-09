@@ -4,7 +4,9 @@ using Weir.Core.Jobs;
 using Weir.Core.Json;
 using Weir.Core.Media;
 using Weir.Core.MediaManagers;
+using Weir.Core.Observability;
 using Weir.Core.Processing;
+using Weir.Core.Processing.RemuxPass;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -52,6 +54,11 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
         _ownership = ownership;
     }
 
+    /// <summary>Test seam: how long a file that was not there is given to come back before Weir believes it is gone.</summary>
+    internal TimeSpan GoneSettle { get; init; } = GoneSources.DefaultSettle;
+
+    private const string GoneLooksKey = "gone_looks";
+
     public string JobKind => IntakeRules.PassThroughJobKind;
 
     public async Task HandleAsync(JobWorkContext context, CancellationToken cancellationToken)
@@ -84,10 +91,10 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
             cancellationToken).ConfigureAwait(false);
 
         // 2. The copy, with no transaction open — this can take minutes on a large file.
-        PassThroughDeliveryResult result;
+        PassThroughDeliveryResult? delivered;
         try
         {
-            result = await PassThroughDelivery.DeliverUnchangedAsync(delivery, relativePath, _ownership).ConfigureAwait(false);
+            delivered = await DeliverUnlessGoneAsync(delivery, relativePath, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or PassThroughIntegrityException or FileNotFoundException or InvalidOperationException)
         {
@@ -116,6 +123,12 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
 
             // Recorded above in plain words; the worker still fails the job but does not say it twice (#488).
             throw new AlreadyRecordedFailureException(exception.Message, exception);
+        }
+
+        if (delivered is not { } result)
+        {
+            await SettleGoneAsync(context, payload, delivery, relativePath, cancellationToken).ConfigureAwait(false);
+            return;
         }
 
         // A drive short of room holds the file rather than fail it: nothing was copied, and it is looked at again later.
@@ -147,15 +160,108 @@ public sealed class ProcessingPassThroughHandler : IJobHandler
                 .Set("output_file", result.Destination)
                 .Set("processing_output_folder_resolved", RemuxPassPaths.Resolve(delivery.OutputFolder))
                 .Set("passed_through_after_failure", true);
-            var reportPayload = WireJsonWriter.Dumps(new WireObject().Set("origin", origin).Set("library_id", delivery.LibraryId), WireJsonFormat.Compact);
-            var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
-            string status;
-            await using (uow.ConfigureAwait(false))
-            {
-                status = await _reporter.ReportHandoffCompletionAsync(uow, reportPayload, reportResult, cancellationToken).ConfigureAwait(false);
-            }
+            await ReportToManagerAsync(origin, delivery.LibraryId, reportResult, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
-            _logger.LogInformation("Pass-through hand-off report: {Status}", status);
+    /// <summary>Tells the manager that handed the file over how it ended. Reporting never raises.</summary>
+    private async Task ReportToManagerAsync(WireObject origin, long libraryId, WireObject reportResult, CancellationToken cancellationToken)
+    {
+        if (_reporter is null)
+        {
+            return;
+        }
+
+        var reportPayload = WireJsonWriter.Dumps(new WireObject().Set("origin", origin).Set("library_id", libraryId), WireJsonFormat.Compact);
+        var uow = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
+        string status;
+        await using (uow.ConfigureAwait(false))
+        {
+            status = await _reporter.ReportHandoffCompletionAsync(uow, reportPayload, reportResult, cancellationToken).ConfigureAwait(false);
+        }
+
+        _logger.LogInformation("Pass-through hand-off report: {Status}", status);
+    }
+
+    /// <summary>
+    /// The copy, or null when the original is gone. A file that was not there is given a few seconds to come back, as a share that
+    /// dropped for a moment would; one that is back is copied then.
+    /// </summary>
+    private async Task<PassThroughDeliveryResult?> DeliverUnlessGoneAsync(PassThroughDeliverySettings delivery, string relativePath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await PassThroughDelivery.DeliverUnchangedAsync(delivery, relativePath, _ownership).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Whatever the copy raised, a file that is gone has nothing left to deliver.
+        catch (Exception) when (GoneSources.HasLeft(delivery.WatchedFolder, relativePath))
+#pragma warning restore CA1031
+        {
+            await Task.Delay(GoneSettle, cancellationToken).ConfigureAwait(false);
+        }
+
+        return GoneSources.HasLeft(delivery.WatchedFolder, relativePath)
+            ? null
+            : await PassThroughDelivery.DeliverUnchangedAsync(delivery, relativePath, _ownership).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A file deleted before it could be handed back. The first time it is held, not forgotten, with a look booked for after the
+    /// scan's grace for a vanished file; Activity says once, plainly, that there is nothing to do. That look finds the file back, and
+    /// hands it back, or still gone, and forgets it and tells the manager that handed it over.
+    /// </summary>
+    private async Task SettleGoneAsync(
+        JobWorkContext context, WireObject payload, PassThroughDeliverySettings delivery, string relativePath, CancellationToken cancellationToken)
+    {
+        var looks = payload.Get(GoneLooksKey) is WireInteger counted ? (long)counted.Value : 0;
+        var final = looks > 0;
+        var now = _time.GetUtcNow();
+        var lookAgainAt = now + GoneSources.LookAgainAfter;
+        var name = MediaPathNames.Name(relativePath, OperatingSystem.IsWindows());
+        await LockedWrites.RunAsync(
+            _database,
+            async uow =>
+            {
+                if (final)
+                {
+                    await RemuxPassFileState.ForgetGoneAsync(uow, delivery.LibraryId, relativePath).ConfigureAwait(false);
+                }
+                else
+                {
+                    await RemuxPassFileState.HoldGoneAsync(uow, delivery.LibraryId, relativePath, lookAgainAt).ConfigureAwait(false);
+                }
+
+                var detail = OperatorMessages.ActivityDetailEnvelope("processing", "pass_through", "worker", "skipped", userMessage: GoneSourceText.Reason)
+                    .Set("job_id", context.Id)
+                    .Set("relative_media_path", relativePath)
+                    .Set("library_id", delivery.LibraryId);
+                await SqliteActivityWriter.RecordAsync(uow, new ActivityEventDraft(
+                    ActivityEventTypes.ProcessingFileLeftWatchedFolder,
+                    "processing",
+                    GoneSourceText.Title(name),
+                    WireJsonWriter.Dumps(detail, WireJsonFormat.Compact))).ConfigureAwait(false);
+            },
+            _logger,
+            "pass-through of a file that is gone",
+            cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("{Path} is no longer in the watched folder, so there is nothing to hand back.", relativePath);
+
+        if (!final)
+        {
+            await _jobs.EnqueueOrGetAsync(
+                $"{IntakeRules.PassThroughJobKind}:gone-wait:{context.Id}",
+                IntakeRules.PassThroughJobKind,
+                WireJsonWriter.Dumps(payload.Copy().Set(GoneLooksKey, 1), WireJsonFormat.Compact),
+                notBefore: lookAgainAt,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        else if (FollowUpJobPayload.Origin(payload) is { IsTruthy: true } origin)
+        {
+            var reportResult = new WireObject()
+                .Set("ok", true)
+                .Set("outcome", RemuxPassOutcomes.SourceGone)
+                .Set("relative_media_path", relativePath);
+            await ReportToManagerAsync(origin, delivery.LibraryId, reportResult, cancellationToken).ConfigureAwait(false);
         }
     }
 

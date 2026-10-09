@@ -275,6 +275,19 @@ public sealed class MediaManagerRulesTests
     }
 
     [Fact]
+    public void A_download_that_is_no_longer_there_is_reported_as_source_gone_with_no_disposition()
+    {
+        var body = CompletionReports.BuildCompletionBody(DelunoOrigin, Dict("""{"ok":true,"outcome":"source_gone","reason":"This file is no longer in the watched folder, so there is nothing to do.","relative_media_path":"Film/film.mkv"}"""));
+
+        Assert.Equal(
+            """{"handoffId":"handoff-1","status":"failed","processorName":"Weir","libraryId":"lib-movies","message":"The download is no longer there, so Weir had nothing to do.","sourceRemoved":false,"failureClass":"source_gone","outputFiles":[]}""",
+            WireJsonWriter.Dumps(body, WireJsonFormat.Compact));
+        Assert.False(body.ContainsKey("disposition"));
+        Assert.Equal(CompletionReports.SourceGoneMessage, CompletionReports.MessageFor(Dict("""{"ok":true,"outcome":"source_gone"}""")));
+        Assert.False(CompletionReports.IsSucceeded(Dict("""{"ok":true,"outcome":"source_gone"}""")));
+    }
+
+    [Fact]
     public void Failures_carry_the_reason_and_what_happened_to_the_source()
     {
         var failed = CompletionReports.BuildCompletionBody(Origin, Dict("""{"ok":false,"outcome":"failed_before_execution","reason":"relative_media_path is required"}"""));

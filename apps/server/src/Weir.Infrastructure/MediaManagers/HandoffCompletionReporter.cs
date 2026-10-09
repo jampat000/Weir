@@ -164,6 +164,10 @@ public sealed partial class HandoffCompletionReporter
         {
             title = $"Told {name} that {fileName} is ready to import";
         }
+        else if (body.Get("failureClass") is WireString { Value: CompletionReports.SourceGoneFailureClass })
+        {
+            title = $"Told {name} that {fileName} is no longer there";
+        }
         else
         {
             title = $"Told {name} that Weir could not process {fileName}";
@@ -304,6 +308,28 @@ public sealed partial class HandoffCompletionReporter
         var delivery = await PostHandoffReportAsync(target, body, cancellationToken).ConfigureAwait(false);
         await RecordUntrackedOutcomeAsync(uow, origin, outcome, (target, delivery)).ConfigureAwait(false);
         return delivery.Status;
+    }
+
+    /// <summary>
+    /// The manager did not answer, or answered with a server-side failure (5xx, request timeout, too many requests), so the same report
+    /// may be accepted later. A refusal of the report itself (4xx) is not.
+    /// </summary>
+    public static bool IsTransientFailure(HandoffReportDelivery delivery)
+    {
+        ArgumentNullException.ThrowIfNull(delivery);
+        if (delivery.Accepted)
+        {
+            return false;
+        }
+
+        const string marker = "answered HTTP ";
+        var at = delivery.Status.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0)
+        {
+            return IsNotAnswering(delivery);
+        }
+
+        return int.TryParse(delivery.Status.AsSpan(at + marker.Length), CultureInfo.InvariantCulture, out var status) && (status >= 500 || status is 408 or 429);
     }
 
     /// <summary>The manager did not answer at all, as opposed to answering with a refusal.</summary>

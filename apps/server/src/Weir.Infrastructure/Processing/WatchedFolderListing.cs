@@ -154,20 +154,40 @@ public static class WatchedFolderListing
         return new WatchedFolderScanCandidates(found, rejected, [.. rejectedSuffixes]);
     }
 
-    /// <summary>Every file under the root, followed through symbolic links the way a path lookup follows them.</summary>
-    private static IEnumerable<FileInfo> Walk(string root, bool topLevelOnly)
+    /// <summary>
+    /// Every file under the root, followed through symbolic links the way a path lookup follows them. One folder at a time, so a
+    /// folder deleted while the walk is under way costs only itself: its files are gone, and the rest of the tree is still listed.
+    /// A folder Weir may not read still fails the scan, which is a real problem. <paramref name="list"/> is the test seam that
+    /// reads one folder.
+    /// </summary>
+    internal static List<FileInfo> Walk(string root, bool topLevelOnly, Func<DirectoryInfo, IEnumerable<FileSystemInfo>>? list = null)
     {
-        IEnumerable<FileSystemInfo> entries;
-        try
+        list ??= folder => folder.EnumerateFileSystemInfos();
+        var found = new List<FileInfo>();
+        var pending = new Stack<DirectoryInfo>([new DirectoryInfo(root)]);
+        while (pending.TryPop(out var folder))
         {
-            entries = new DirectoryInfo(root).EnumerateFileSystemInfos("*", topLevelOnly ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return [];
+            try
+            {
+                foreach (var entry in list(folder))
+                {
+                    if ((entry as FileInfo ?? LinkedFile(entry)) is { } file)
+                    {
+                        found.Add(file);
+                    }
+                    else if (entry is DirectoryInfo subfolder && !topLevelOnly)
+                    {
+                        pending.Push(subfolder);
+                    }
+                }
+            }
+            catch (DirectoryNotFoundException)
+            {
+                // This folder was deleted under the walk.
+            }
         }
 
-        return entries.Select(entry => entry is FileInfo file ? file : LinkedFile(entry)).OfType<FileInfo>();
+        return found;
     }
 
     /// <summary>A directory entry that is a symbolic link to a file counts as that file, as <see cref="File.Exists"/> treats it.</summary>

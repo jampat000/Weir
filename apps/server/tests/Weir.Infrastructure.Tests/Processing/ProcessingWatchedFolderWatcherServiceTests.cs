@@ -6,6 +6,7 @@ using Weir.Core.Processing;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Sqlite;
+using Weir.Infrastructure.Tests.Media;
 using Weir.Infrastructure.Tests.Platform;
 
 namespace Weir.Infrastructure.Tests.Processing;
@@ -405,6 +406,112 @@ public sealed class ProcessingWatchedFolderWatcherServiceTests
             // The watcher for this folder was replaced, not merely left running after the error.
             await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 2);
             Assert.NotSame(first, service.CreatedFor(watched)[1]);
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task A_folder_removed_from_inside_the_watched_folder_restarts_the_watcher_without_a_warning()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-9"));
+        var watched = store.Home.Join("watch");
+        Directory.CreateDirectory(Path.Combine(watched, "Release"));
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(output);
+        await CreateLibraryAsync(store, watched, output);
+        var log = new ListLogger<ProcessingWatchedFolderWatcherService>();
+
+        var service = new FakeWatcherService(store.Database, store.Options, new ProcessingJobStore(store.Database, TimeProvider.System),
+            new WatcherStateStore(), Libraries, TimeProvider.System, log);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 1);
+            Directory.Delete(Path.Combine(watched, "Release"));
+
+            var removed = new DirectoryNotFoundException("Could not find a part of the path.");
+            service.CreatedFor(watched)[0].RaiseError(removed);
+
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 2);
+            await Eventually.ThatAsync(() => ScanJobPayloads(store).Count > 0);
+            Assert.DoesNotContain(log.Entries, entry => entry.Level >= Microsoft.Extensions.Logging.LogLevel.Warning);
+            Assert.Contains(log.Entries, entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Information && entry.Message.Contains("a folder inside", StringComparison.Ordinal));
+            Assert.Contains(removed, log.Exceptions);
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task An_access_denied_error_and_a_repeated_removal_are_warnings_even_with_the_watched_folder_there()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-11"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        await CreateLibraryAsync(store, watched, output);
+        var log = new ListLogger<ProcessingWatchedFolderWatcherService>();
+
+        var service = new FakeWatcherService(store.Database, store.Options, new ProcessingJobStore(store.Database, TimeProvider.System),
+            new WatcherStateStore(), Libraries, TimeProvider.System, log);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 1);
+            service.CreatedFor(watched)[0].RaiseError(new System.ComponentModel.Win32Exception(5, "Access is denied."));
+
+            await Eventually.ThatAsync(() => log.Entries.Any(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning));
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 2);
+
+            service.CreatedFor(watched)[1].RaiseError(new DirectoryNotFoundException("first"));
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 3);
+            Assert.Single(log.Entries, entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Information && entry.Message.Contains("a folder inside", StringComparison.Ordinal));
+
+            service.CreatedFor(watched)[2].RaiseError(new DirectoryNotFoundException("second"));
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 4);
+            var warnings = log.Entries.Where(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning).ToList();
+            Assert.Equal(2, warnings.Count);
+            Assert.Contains("keeps being interrupted", warnings[1].Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task A_watched_folder_that_is_itself_gone_warns_in_plain_words_and_queues_no_scan()
+    {
+        using var store = new StoreFixture(("WEIR_CREDENTIALS_SECRET", "watcher-tests-secret-10"));
+        var watched = store.Home.Join("watch");
+        var output = store.Home.Join("out");
+        Directory.CreateDirectory(watched);
+        Directory.CreateDirectory(output);
+        await CreateLibraryAsync(store, watched, output);
+        var log = new ListLogger<ProcessingWatchedFolderWatcherService>();
+
+        var service = new FakeWatcherService(store.Database, store.Options, new ProcessingJobStore(store.Database, TimeProvider.System),
+            new WatcherStateStore(), Libraries, TimeProvider.System, log);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await Eventually.ThatAsync(() => service.CreatedFor(watched).Count == 1);
+            var first = service.CreatedFor(watched)[0];
+            Directory.Delete(watched, recursive: true);
+
+            first.RaiseError(new IOException("Access is denied."));
+
+            await Eventually.ThatAsync(() => log.Entries.Any(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning));
+            var warning = log.Entries.First(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning);
+            Assert.Contains("can no longer see", warning.Message, StringComparison.Ordinal);
+            Assert.Contains(watched, warning.Message, StringComparison.Ordinal);
+            Assert.Empty(ScanJobPayloads(store));
         }
         finally
         {

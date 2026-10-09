@@ -15,9 +15,11 @@ public interface IFailurePolicy
 {
     /// <summary>
     /// Under <c>reject</c>, queues a reject for a file whose content was found unusable. True when
-    /// one was queued.
+    /// one was queued. <paramref name="rejectionKind"/> says why the file was refused (<c>RejectionKinds</c>), and rides on the
+    /// reject job so it can tell a file Weir could not read from one that is plainly bad.
     /// </summary>
-    Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject? origin);
+    Task<bool> RejectBadReleaseAsync(
+        UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, string? rejectionKind, WireObject? origin);
 
     /// <summary>
     /// Acts on a recorded failure once no retry is coming. Returns the follow-up queued,
@@ -50,7 +52,8 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
     }
 
-    public Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject? origin)
+    public Task<bool> RejectBadReleaseAsync(
+        UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, string? rejectionKind, WireObject? origin)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
@@ -66,6 +69,11 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         }
 
         body.Set("failure_class", "preflight");
+        if (!string.IsNullOrEmpty(rejectionKind))
+        {
+            body.Set("rejection_kind", rejectionKind);
+        }
+
         Enqueue(uow, $"{RejectJobKind}:{library.Id}:{relativePath}:{FingerprintTag(library, relativePath)}", RejectJobKind, body, library);
         return Task.FromResult(true);
     }
@@ -86,7 +94,7 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         }
 
         var currentReason = await RemuxPassFileState.StatusReasonAsync(uow, library.Id, relativePath).ConfigureAwait(false);
-        if (badRelease && await RejectBadReleaseAsync(uow, library, relativePath, currentReason ?? "Weir could not read this file's contents.", origin).ConfigureAwait(false))
+        if (badRelease && await RejectBadReleaseAsync(uow, library, relativePath, currentReason ?? "Weir could not read this file's contents.", null, origin).ConfigureAwait(false))
         {
             await RemuxPassFileState.AppendStatusReasonAsync(uow, library.Id, relativePath,
                 "Weir is telling your media manager this release is bad so it can find a different one.").ConfigureAwait(false);
@@ -157,7 +165,8 @@ public sealed class HoldingFailurePolicy : IFailurePolicy
     public Task QueueHandoffRetryAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject origin, DateTimeOffset startsAt) =>
         Task.CompletedTask;
 
-    public Task<bool> RejectBadReleaseAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, WireObject? origin) =>
+    public Task<bool> RejectBadReleaseAsync(
+        UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, string? rejectionKind, WireObject? origin) =>
         Task.FromResult(false);
 
     public Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, WireObject? origin, bool badRelease) =>

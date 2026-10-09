@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
@@ -37,6 +38,9 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
     private readonly LibraryStore _libraries;
     private readonly FileStateStore _files;
     private readonly FileSkipMarkerStore _skipMarkers;
+
+    /// <summary>The workflows whose watched folder the last scan could not see, so the warning is said once and the return once.</summary>
+    private readonly ConcurrentDictionary<long, byte> _foldersNotSeen = new();
 
     private readonly ScanWakeups? _wakeups;
     private readonly ILogger<ProcessingWatchedFolderScanDispatchJobHandler>? _logger;
@@ -151,6 +155,29 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
                 // However this scan was queued, it queues nothing: a Deluno-linked workflow is processed only from Deluno's hand-off.
                 _logger?.LogInformation("Did not scan {Library}: {Reason}", library.Name, links.ScanSkippedReason);
                 return null;
+            }
+
+            if (library.WatchedFolder.Trim() is { Length: > 0 } saved)
+            {
+                if (!Directory.Exists(ProcessingLibraryFolders.ExpandForFilesystem(saved)))
+                {
+                    // Not a failed job to retry: the folder is gone (deleted, or its drive unmounted) and a retry would find the same. This
+                    // is a real problem, so it is a warning in plain words, said once until the folder is back; the next scan looks again.
+                    if (_foldersNotSeen.TryAdd(library.Id, 0))
+                    {
+                        _logger?.LogWarning(
+                            "Did not scan {Library}: Weir can't see its watched folder {Folder}. It may have been deleted or its drive disconnected. Check that the folder exists and that Weir can reach it.",
+                            library.Name,
+                            saved);
+                    }
+
+                    return null;
+                }
+
+                if (_foldersNotSeen.TryRemove(library.Id, out _))
+                {
+                    _logger?.LogInformation("The watched folder {Folder} for {Library} is back, so Weir is scanning it again.", saved, library.Name);
+                }
             }
 
             var (paths, pathError) = WatchedFolderScanOps.ResolvePathRuntimeForLibrary(library, _options.WeirHome);

@@ -72,6 +72,11 @@ internal sealed class ProcessingWatchedFolderScanDispatchEndpointHandlers
                 $"{label} watched folder is not set in saved path settings. This scan reads media files under that folder — configure it first.");
         }
 
+        if (await ProcessingWatchedFolderScanDispatchEnqueue.MissingWatchedFolderMessageAsync(uow, _libraries, mediaScope, libraryId).ConfigureAwait(false) is { } missing)
+        {
+            throw new ApiException(StatusCodes.Status400BadRequest, missing);
+        }
+
         var job = await ProcessingWatchedFolderScanDispatchEnqueue.EnqueueScanDispatchJobAsync(
             uow, _jobs, enqueueRemuxJobs, "manual", mediaScope, libraryId).ConfigureAwait(false);
         await request.CommitAsync().ConfigureAwait(false);
