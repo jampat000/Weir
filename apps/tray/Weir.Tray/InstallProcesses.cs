@@ -92,6 +92,26 @@ static class InstallProcesses
         }
     }
 
+    /// <summary>
+    /// Whether a Weir tray other than this process is running from inside <paramref name="root"/>, in this Windows
+    /// session, where it would hold the single-instance mutex.
+    /// </summary>
+    internal static bool AnotherTrayRuns(string root, Action<string> log, string why)
+    {
+        var running = FindOwn(root, sameSessionOnly: true, log, why);
+        try
+        {
+            return running.Any(p => p.Name == TrayName);
+        }
+        finally
+        {
+            foreach (var own in running)
+            {
+                own.Process.Dispose();
+            }
+        }
+    }
+
     // Every server is asked at once and the graceful wait is shared, so a second server does not add a second wait.
     private static List<int> StopServers(List<OwnProcess> servers, ServerStopTimeouts timeouts, Action<string> log, string why)
     {
