@@ -1,24 +1,34 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Weir.Infrastructure.Http;
 using Weir.Infrastructure.MediaManagers;
-using Xunit.Abstractions;
 
 namespace Weir.Infrastructure.Tests.Http;
 
 /// <summary>
 /// A program that listens on IPv4 only must be reachable as <c>localhost</c> without Windows first retrying a refused
-/// connect to ::1 for about two seconds. The listener here is bound to 127.0.0.1 alone.
+/// connect to ::1 for about two seconds. The listener here is bound to 127.0.0.1 alone. How long a connect takes depends on
+/// the machine, so what is checked is the order: where the same port is also open on ::1, an answer from the IPv4 listener
+/// proves ::1 was not tried first.
 /// </summary>
-public sealed class LoopbackFirstConnectTests(ITestOutputHelper output) : IDisposable
+public sealed class LoopbackFirstConnectTests : IDisposable
 {
     private static readonly byte[] OkResponse = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
-    private static readonly TimeSpan Ceiling = TimeSpan.FromMilliseconds(1000);
+    private static readonly byte[] WrongListenerResponse = Encoding.ASCII.GetBytes("HTTP/1.1 418 Wrong listener\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
 
-    private readonly TcpListener _listener = StartListener();
+    private readonly TcpListener _listener;
+    private readonly TcpListener? _ipv6Listener;
     private readonly CancellationTokenSource _stop = new();
+
+    public LoopbackFirstConnectTests()
+    {
+        (_listener, _ipv6Listener) = StartListeners();
+        if (_ipv6Listener is not null)
+        {
+            _ = ServeAsync(_ipv6Listener, WrongListenerResponse);
+        }
+    }
 
     private int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
@@ -26,31 +36,32 @@ public sealed class LoopbackFirstConnectTests(ITestOutputHelper output) : IDispo
     {
         _stop.Cancel();
         _listener.Stop();
+        _ipv6Listener?.Stop();
         _stop.Dispose();
     }
 
     [Fact]
-    public async Task The_manager_handler_reaches_an_ipv4_only_listener_as_localhost_quickly()
+    public async Task The_manager_handler_reaches_an_ipv4_only_listener_as_localhost_by_way_of_ipv4()
     {
         using var factory = new SocketsManagerHttpHandlerFactory();
 
-        await AssertReachedQuicklyAsync(factory.Handler(followRedirects: false, ManagerAddressPolicy.Local));
+        await AssertReachedOverIpv4Async(factory.Handler(followRedirects: false, ManagerAddressPolicy.Local));
     }
 
     [Fact]
-    public async Task The_redirect_following_manager_handler_reaches_an_ipv4_only_listener_as_localhost_quickly()
+    public async Task The_redirect_following_manager_handler_reaches_an_ipv4_only_listener_as_localhost_by_way_of_ipv4()
     {
         using var factory = new SocketsManagerHttpHandlerFactory();
 
-        await AssertReachedQuicklyAsync(factory.Handler(followRedirects: true, ManagerAddressPolicy.Local));
+        await AssertReachedOverIpv4Async(factory.Handler(followRedirects: true, ManagerAddressPolicy.Local));
     }
 
     [Fact]
-    public async Task A_plain_handler_using_the_shared_callback_reaches_an_ipv4_only_listener_as_localhost_quickly()
+    public async Task A_plain_handler_using_the_shared_callback_reaches_an_ipv4_only_listener_as_localhost_by_way_of_ipv4()
     {
         using var handler = new SocketsHttpHandler { ConnectCallback = LoopbackFirstConnect.ConnectAsync };
 
-        await AssertReachedQuicklyAsync(handler);
+        await AssertReachedOverIpv4Async(handler);
     }
 
     [Fact]
@@ -122,30 +133,28 @@ public sealed class LoopbackFirstConnectTests(ITestOutputHelper output) : IDispo
     public void Only_the_name_localhost_is_special(string host, bool expected) =>
         Assert.Equal(expected, LoopbackFirstConnect.IsLocalhost(host));
 
-    private async Task AssertReachedQuicklyAsync(HttpMessageHandler handler)
+    private async Task AssertReachedOverIpv4Async(HttpMessageHandler handler)
     {
         using var client = new HttpClient(handler, disposeHandler: false);
         _ = ServeAsync();
 
-        var timer = Stopwatch.StartNew();
         using var response = await client.GetAsync(new Uri($"http://localhost:{Port}/"));
-        timer.Stop();
 
-        output.WriteLine($"GET http://localhost:{Port}/ answered {(int)response.StatusCode} in {timer.ElapsedMilliseconds} ms");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(timer.Elapsed < Ceiling, $"Took {timer.ElapsedMilliseconds} ms to reach a listener on 127.0.0.1 as localhost.");
     }
 
-    private async Task ServeAsync()
+    private Task ServeAsync() => ServeAsync(_listener, OkResponse);
+
+    private async Task ServeAsync(TcpListener listener, byte[] response)
     {
         try
         {
-            using var client = await _listener.AcceptTcpClientAsync(_stop.Token).ConfigureAwait(false);
+            using var client = await listener.AcceptTcpClientAsync(_stop.Token).ConfigureAwait(false);
             var stream = client.GetStream();
             await using (stream.ConfigureAwait(false))
             {
                 _ = await stream.ReadAsync(new byte[1024], _stop.Token).ConfigureAwait(false);
-                await stream.WriteAsync(OkResponse, _stop.Token).ConfigureAwait(false);
+                await stream.WriteAsync(response, _stop.Token).ConfigureAwait(false);
             }
         }
         catch (Exception exception) when (exception is SocketException or ObjectDisposedException or OperationCanceledException or IOException)
@@ -158,6 +167,27 @@ public sealed class LoopbackFirstConnectTests(ITestOutputHelper output) : IDispo
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         return listener;
+    }
+
+    /// <summary>An IPv4 listener and, where the machine has IPv6, one on the same port at ::1 (a few ports are tried, in case another program holds that one).</summary>
+    private static (TcpListener Ipv4, TcpListener? Ipv6) StartListeners()
+    {
+        for (var attempt = 0; attempt < 10 && Socket.OSSupportsIPv6; attempt++)
+        {
+            var ipv4 = StartListener();
+            var ipv6 = new TcpListener(IPAddress.IPv6Loopback, ((IPEndPoint)ipv4.LocalEndpoint).Port);
+            try
+            {
+                ipv6.Start();
+                return (ipv4, ipv6);
+            }
+            catch (SocketException)
+            {
+                ipv4.Stop();
+            }
+        }
+
+        return (StartListener(), null);
     }
 
     private static int FreePort()
