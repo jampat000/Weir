@@ -52,14 +52,14 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
     }
 
-    public Task<bool> RejectBadReleaseAsync(
+    public async Task<bool> RejectBadReleaseAsync(
         UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, string reason, string? rejectionKind, WireObject? origin)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
         if (ProcessingFailurePolicies.Normalize(library.FailurePolicy) != ProcessingFailurePolicies.Reject)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
         var body = Body(library, relativePath, origin);
@@ -74,8 +74,8 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
             body.Set("rejection_kind", rejectionKind);
         }
 
-        Enqueue(uow, $"{RejectJobKind}:{library.Id}:{relativePath}:{FingerprintTag(library, relativePath)}", RejectJobKind, body, library);
-        return Task.FromResult(true);
+        await EnqueueAsync(uow, $"{RejectJobKind}:{library.Id}:{relativePath}:{FingerprintTag(library, relativePath)}", RejectJobKind, body, library).ConfigureAwait(false);
+        return true;
     }
 
     public async Task<string?> ApplyFailurePolicyAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, bool willRetry, WireObject? origin, bool badRelease)
@@ -102,20 +102,19 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         }
 
         // Any other failure is not evidence the release is bad, so under reject it is handed back like pass_through.
-        Enqueue(uow, $"{PassThroughJobKind}:{library.Id}:{relativePath}:{FingerprintTag(library, relativePath)}", PassThroughJobKind, Body(library, relativePath, origin), library);
+        await EnqueueAsync(uow, $"{PassThroughJobKind}:{library.Id}:{relativePath}:{FingerprintTag(library, relativePath)}", PassThroughJobKind, Body(library, relativePath, origin), library).ConfigureAwait(false);
         await RemuxPassFileState.AppendStatusReasonAsync(uow, library.Id, relativePath,
             "Weir could not process this file, so it is handing the original back to the output folder unchanged.").ConfigureAwait(false);
         return ProcessingFailurePolicies.PassThrough;
     }
 
-    public Task QueueHandoffRetryAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject origin, DateTimeOffset startsAt)
+    public async Task QueueHandoffRetryAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject origin, DateTimeOffset startsAt)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(origin);
         var body = Body(library, relativePath, origin).Set("media_scope", ProcessingMediaScopes.Normalize(library.MediaType)).Set("trigger", "retry").Set(HandoffRetries.PayloadMarker, true);
-        Enqueue(uow, $"{IntakeRules.RemuxPassJobKind}:handoff-retry:{library.Id}:{relativePath}:{startsAt.ToUnixTimeSeconds()}", IntakeRules.RemuxPassJobKind, body, library, startsAt);
-        return Task.CompletedTask;
+        await EnqueueAsync(uow, $"{IntakeRules.RemuxPassJobKind}:handoff-retry:{library.Id}:{relativePath}:{startsAt.ToUnixTimeSeconds()}", IntakeRules.RemuxPassJobKind, body, library, startsAt).ConfigureAwait(false);
     }
 
     private static WireObject Body(ProcessingLibraryRecord library, string relativePath, WireObject? origin)
@@ -129,8 +128,8 @@ public sealed class QueueingFailurePolicy : IFailurePolicy
         return body;
     }
 
-    private void Enqueue(UnitOfWork uow, string dedupeKey, string jobKind, WireObject body, ProcessingLibraryRecord library, DateTimeOffset? notBefore = null) =>
-        _jobs.EnqueueOrGet(
+    private Task<ProcessingJob> EnqueueAsync(UnitOfWork uow, string dedupeKey, string jobKind, WireObject body, ProcessingLibraryRecord library, DateTimeOffset? notBefore = null) =>
+        _jobs.EnqueueOrGetAsync(
             uow,
             dedupeKey,
             jobKind,

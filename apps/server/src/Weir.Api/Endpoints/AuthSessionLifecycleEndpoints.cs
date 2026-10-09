@@ -257,7 +257,7 @@ internal sealed class AuthSessionLifecycleEndpointHandlers
         var logger = AuthEndpoints.Logger(request);
         logger.LogInformation("auth event: bootstrap attempted");
         var uow = await request.DbAsync().ConfigureAwait(false);
-        uow.BeginImmediate();
+        await uow.BeginImmediateAsync().ConfigureAwait(false);
         if (!await request.Auth.BootstrapAllowedAsync(uow).ConfigureAwait(false))
         {
             logger.LogWarning("auth event: bootstrap denied (admin already exists)");

@@ -10,7 +10,7 @@ namespace Weir.Infrastructure.Sqlite;
 
 /// <summary>
 /// One request's database work: reads run outside a transaction until the first write, which begins one;
-/// the owner commits on success, and anything uncommitted is rolled back on dispose. That transaction is always <c>BEGIN IMMEDIATE</c> — see <see cref="EnsureTransaction"/> for why a
+/// the owner commits on success, and anything uncommitted is rolled back on dispose. That transaction is always <c>BEGIN IMMEDIATE</c> — see <see cref="EnsureTransactionAsync"/> for why a
 /// deferred one could not survive another writer committing mid-unit (#586).
 /// </summary>
 /// <remarks>
@@ -29,6 +29,7 @@ public sealed class UnitOfWork : IAsyncDisposable
     private SqliteTransaction? _transaction;
     private List<Action>? _afterCommit;
     private Dictionary<string, object>? _items;
+    private bool _holdsWriteGate;
 
     private UnitOfWork(SqliteDatabase database, SqliteConnection connection, CancellationToken cancellationToken)
     {
@@ -74,27 +75,27 @@ public sealed class UnitOfWork : IAsyncDisposable
 
     /// <summary>
     /// Begin the transaction now, before this unit has read or written anything (the bootstrap lock).
-    /// Every transaction here is <c>BEGIN IMMEDIATE</c> (see <see cref="EnsureTransaction"/>); this is
+    /// Every transaction here is <c>BEGIN IMMEDIATE</c> (see <see cref="EnsureTransactionAsync"/>); this is
     /// for a caller that wants the write lock held across its reads as well, and it must therefore come
     /// before them.
     /// </summary>
-    public void BeginImmediate()
+    public async Task BeginImmediateAsync()
     {
         if (_transaction is not null)
         {
             throw new InvalidOperationException("A transaction is already open.");
         }
 
-        EnsureTransaction();
+        await EnsureTransactionAsync().ConfigureAwait(false);
     }
 
     /// <summary>
     /// Begin this unit's transaction now, as a deferred <c>BEGIN</c>: no write lock, and every read that
     /// follows shares one consistent snapshot (#636) instead of each running as its own short autocommit read.
     /// For a caller that issues several reads on <see cref="Connection"/> directly and needs them to agree with
-    /// each other without contending with writers. Never write inside a unit begun this way: <see cref="EnsureTransaction"/>
+    /// each other without contending with writers. Never write inside a unit begun this way: <see cref="EnsureTransactionAsync"/>
     /// would keep the deferred transaction rather than upgrading it, reintroducing the <c>SQLITE_BUSY_SNAPSHOT</c>
-    /// failure that <see cref="EnsureTransaction"/>'s own remarks describe (#586).
+    /// failure that <see cref="EnsureTransactionAsync"/>'s own remarks describe (#586).
     /// </summary>
     public void BeginRead()
     {
@@ -111,11 +112,11 @@ public sealed class UnitOfWork : IAsyncDisposable
     /// The write transaction, begun now if this unit of work has not written yet: for code that issues its own
     /// commands on <see cref="Connection"/> as part of this unit of work (the job queue's enqueue). Such code
     /// may read before it writes, so this is the call that most depends on the transaction being immediate
-    /// (<see cref="EnsureTransaction"/>, #586); ask for it at the point of the write, not before.
+    /// (<see cref="EnsureTransactionAsync"/>, #586); ask for it at the point of the write, not before.
     /// </summary>
-    public SqliteTransaction WriteTransaction()
+    public async Task<SqliteTransaction> WriteTransactionAsync()
     {
-        EnsureTransaction();
+        await EnsureTransactionAsync().ConfigureAwait(false);
         return _transaction!;
     }
 
@@ -125,7 +126,7 @@ public sealed class UnitOfWork : IAsyncDisposable
 
     public async Task<int> ExecuteAsync(string sql, params (string Name, object? Value)[] parameters)
     {
-        EnsureTransaction();
+        await EnsureTransactionAsync().ConfigureAwait(false);
         var command = Create(sql, parameters);
         await using (command.ConfigureAwait(false))
         {
@@ -136,7 +137,7 @@ public sealed class UnitOfWork : IAsyncDisposable
     /// <summary>A write that returns a value (<c>INSERT … RETURNING</c> or <c>last_insert_rowid()</c>).</summary>
     public async Task<object?> ExecuteScalarWriteAsync(string sql, params (string Name, object? Value)[] parameters)
     {
-        EnsureTransaction();
+        await EnsureTransactionAsync().ConfigureAwait(false);
         var command = Create(sql, parameters);
         await using (command.ConfigureAwait(false))
         {
@@ -190,6 +191,7 @@ public sealed class UnitOfWork : IAsyncDisposable
             await _transaction.CommitAsync(_cancellationToken).ConfigureAwait(false);
             await _transaction.DisposeAsync().ConfigureAwait(false);
             _transaction = null;
+            ReleaseWriteGate();
         }
 
         var callbacks = _afterCommit;
@@ -225,6 +227,7 @@ public sealed class UnitOfWork : IAsyncDisposable
         try
         {
             await _transaction.RollbackAsync(rollbackToken).ConfigureAwait(false);
+            ReleaseWriteGate();
         }
         finally
         {
@@ -247,13 +250,22 @@ public sealed class UnitOfWork : IAsyncDisposable
         {
             // A ROLLBACK that failed leaves the transaction open, and closing a pooled connection does not end it:
             // the handle goes back to the pool as it is, BEGIN IMMEDIATE's write lock included (#640).
-            if (Connection.State == ConnectionState.Open && raw.sqlite3_get_autocommit(Connection.Handle) == 0)
+            try
             {
-                Database.CloseHandle(Connection);
+                if (Connection.State == ConnectionState.Open && raw.sqlite3_get_autocommit(Connection.Handle) == 0)
+                {
+                    Database.CloseHandle(Connection);
+                }
+                else
+                {
+                    await Connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
-            else
+            finally
             {
-                await Connection.DisposeAsync().ConfigureAwait(false);
+                // After the connection, so the next writer finds the write lock free: a rollback that failed was only made
+                // good just above.
+                ReleaseWriteGate();
             }
         }
     }
@@ -263,7 +275,7 @@ public sealed class UnitOfWork : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// A deferred transaction takes the write lock at its first write, so when its first statement is a
-    /// read instead — which is what <see cref="WriteTransaction"/> hands out, and what the job queue's
+    /// read instead — which is what <see cref="WriteTransactionAsync"/> hands out, and what the job queue's
     /// enqueue does with it: look the dedupe key up, then insert — the connection's WAL read snapshot is
     /// pinned at that read. If any other connection commits a real write before the upgrade to a writer,
     /// SQLite refuses it with <c>SQLITE_BUSY_SNAPSHOT</c>. That is not a wait-and-retry condition and
@@ -285,15 +297,39 @@ public sealed class UnitOfWork : IAsyncDisposable
     /// it within <c>busy_timeout</c> fails instead of holding anything. Every transaction in this server is
     /// immediate.
     /// </remarks>
-    private void EnsureTransaction()
+    private async Task EnsureTransactionAsync()
     {
         if (_transaction is not null)
         {
             return;
         }
 
-        _transaction = Connection.BeginTransaction(IsolationLevel.Serializable, deferred: false);
-        Owners.Add(_transaction, this);
+        // Weir's own writers wait their turn here without holding a thread; BEGIN IMMEDIATE below then only waits, in
+        // SQLite's busy handler, for a writer outside this process (see SqliteDatabase.AcquireWriteGateAsync). A unit that
+        // holds its turn while another unit of the same flow waits for one of its own would wait out the busy timeout, as
+        // two connections always have: such a flow commits the first unit before it opens the second.
+        var waited = await Database.AcquireWriteGateAsync(_cancellationToken).ConfigureAwait(false);
+        _holdsWriteGate = true;
+        try
+        {
+            _transaction = await Database.BeginWriteTransactionAsync(Connection, waited, _cancellationToken).ConfigureAwait(false);
+            Owners.Add(_transaction, this);
+        }
+        catch
+        {
+            ReleaseWriteGate();
+            throw;
+        }
+    }
+
+    /// <summary>Gives up this unit's turn at the write lock, if it has one. Safe to call again.</summary>
+    private void ReleaseWriteGate()
+    {
+        if (_holdsWriteGate)
+        {
+            _holdsWriteGate = false;
+            Database.ReleaseWriteGate();
+        }
     }
 
     private SqliteCommand Create(string sql, (string Name, object? Value)[] parameters)

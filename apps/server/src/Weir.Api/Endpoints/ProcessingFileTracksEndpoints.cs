@@ -277,7 +277,7 @@ internal sealed class ProcessingFileTracksEndpointHandlers
             throw new ApiException(StatusCodes.Status400BadRequest, $"Weir could not read this file safely: {exception.Message}");
         }
 
-        var job = ManualPlanSupport.EnqueueManualPlan(uow, _jobs, context, choice, fingerprint);
+        var job = await ManualPlanSupport.EnqueueManualPlanAsync(uow, _jobs, context, choice, fingerprint).ConfigureAwait(false);
         var name = System.IO.Path.GetFileName(context.File.RelativePath);
         await _activity.RecordAsync(
             uow,

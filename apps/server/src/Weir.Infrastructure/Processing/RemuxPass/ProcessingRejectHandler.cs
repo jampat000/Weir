@@ -214,7 +214,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
                     var liveLibrary = await RemuxPassHandler.ResolveLibraryAsync(uow, _libraries, libraryId, null).ConfigureAwait(false);
                     if (liveLibrary is not null)
                     {
-                        EnqueuePassThroughFallback(uow, liveLibrary, relativePath, originRaw);
+                        await EnqueuePassThroughFallbackAsync(uow, liveLibrary, relativePath, originRaw).ConfigureAwait(false);
                     }
 
                     await RemuxPassFileState.MarkFileStatusAsync(
@@ -239,7 +239,7 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
 
     /// <summary>Queues a pass-through, called unconditionally on any reject failure — the reject route never
     /// re-checks the library's failure policy: anything short of certainty always falls back to pass-through.</summary>
-    private void EnqueuePassThroughFallback(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject? origin)
+    private async Task EnqueuePassThroughFallbackAsync(UnitOfWork uow, ProcessingLibraryRecord library, string relativePath, WireObject? origin)
     {
         var body = new WireObject().Set("relative_media_path", relativePath).Set("library_id", library.Id).Set("trigger", "worker");
         if (origin is { IsTruthy: true })
@@ -252,13 +252,13 @@ public sealed partial class ProcessingRejectHandler : IJobHandler
         // evaluate left to right, so inlining this would put a remote stat inside the write lock
         // (#586 made that lock start at BEGIN). QueueingFailurePolicy.Enqueue's callers do the same.
         var dedupeKey = $"{IntakeRules.PassThroughJobKind}:{library.Id}:{relativePath}:{QueueingFailurePolicy.FingerprintTag(library, relativePath)}";
-        _jobs.EnqueueOrGet(
+        await _jobs.EnqueueOrGetAsync(
             uow,
             dedupeKey,
             IntakeRules.PassThroughJobKind,
             WireJsonWriter.Dumps(body, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
-            (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue));
+            (int)Math.Clamp(library.Priority, int.MinValue, int.MaxValue)).ConfigureAwait(false);
     }
 }

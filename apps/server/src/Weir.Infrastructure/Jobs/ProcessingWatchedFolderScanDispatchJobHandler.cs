@@ -8,6 +8,7 @@ using Weir.Core.Settings;
 using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.MediaManagers;
 using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Runtime;
 using Weir.Infrastructure.Settings;
 using Weir.Infrastructure.Sqlite;
 
@@ -92,12 +93,12 @@ public sealed class ProcessingWatchedFolderScanDispatchJobHandler : IJobHandler
             return;
         }
 
-        var candidates = WatchedFolderListing.Candidates(
+        var candidates = await BlockingWork.RunAsync(() => WatchedFolderListing.Candidates(
             scan.Paths.WatchedFolder,
             scan.Rules.MediaExtensions.Count > 0 ? scan.Rules.MediaExtensions : null,
             scan.Rules.ExcludeMarkers,
             scan.Rules.ExcludeHidden,
-            scan.Rules.TopLevelOnly);
+            scan.Rules.TopLevelOnly)).ConfigureAwait(false);
 
         var reads = await UnitOfWork.OpenAsync(_database, cancellationToken).ConfigureAwait(false);
         await using (reads.ConfigureAwait(false))

@@ -40,8 +40,8 @@ public sealed class LibraryScanStore
     public long? FilesSeen(long jobId) => _progress?.FilesSeen(jobId);
 
     /// <summary>
-    /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGet(UnitOfWork, string, string, string?, int, int?, int, DateTimeOffset?)"/>),
-    /// not <see cref="ProcessingJobStore.EnqueueOrGetAsync"/>: that opens its own connection, which — called while an API
+    /// Enqueues the scan on <paramref name="uow"/>'s own connection and transaction (<see cref="ProcessingJobStore.EnqueueOrGetAsync(UnitOfWork, string, string, string?, int, int?, int, DateTimeOffset?)"/>),
+    /// not <see cref="ProcessingJobStore.EnqueueOrGetAsync(string, string, string?, int, int?, int, DateTimeOffset?, CancellationToken)"/>: that opens its own connection, which — called while an API
     /// endpoint's write <see cref="UnitOfWork"/> is still open, as here — can deadlock against it, exactly the trap
     /// <see cref="Weir.Infrastructure.Processing.RequeueStore"/> already documents for the same reason.
     /// </summary>
@@ -49,7 +49,7 @@ public sealed class LibraryScanStore
     /// <paramref name="scheduledAt"/> is the time a scheduled scan was due, recorded on the row so the next one is worked
     /// out from it (<see cref="LastScheduledRunAtAsync"/>); a scan someone asked for has none.
     /// </remarks>
-    public Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger, DateTimeOffset? scheduledAt = null)
+    public async Task<ProcessingJob> RequestScanAsync(UnitOfWork uow, ProcessingJobStore jobs, long libraryId, string trigger, DateTimeOffset? scheduledAt = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
         ArgumentNullException.ThrowIfNull(jobs);
@@ -59,16 +59,16 @@ public sealed class LibraryScanStore
             payload.Set("scheduled_at", due.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         }
 
-        var job = jobs.EnqueueOrGet(
+        var job = await jobs.EnqueueOrGetAsync(
             uow,
             LibraryModeJobKinds.ScanDedupeKey(libraryId),
             LibraryModeJobKinds.ScanKind,
             WireJsonWriter.Dumps(payload, WireJsonFormat.Compact),
             JobQueueRules.DefaultMaxAttempts,
             0,
-            LibraryModePriority.Low);
+            LibraryModePriority.Low).ConfigureAwait(false);
         uow.OnCommitted(() => _changes?.Publish(DataTopics.LibraryScan));
-        return Task.FromResult(job);
+        return job;
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public sealed class LibraryScanStore
             $"DELETE FROM jobs WHERE dedupe_key = @dedupe AND status IN ({string.Join(", ", names)})",
             parameters).ConfigureAwait(false);
 
-        var transaction = uow.WriteTransaction();
+        var transaction = await uow.WriteTransactionAsync().ConfigureAwait(false);
         jobs.AnnounceOnCommit(uow, LibraryModeJobKinds.CleanKind);
         return jobs.EnqueueOrGet(
             uow.Connection,

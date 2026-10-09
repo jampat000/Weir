@@ -102,9 +102,9 @@ public sealed class UnitOfWorkLifecycleTests
         var uow = await UnitOfWork.OpenAsync(db.Database);
         await using (uow.ConfigureAwait(false))
         {
-            var first = uow.WriteTransaction();
+            var first = await uow.WriteTransactionAsync();
             await uow.ExecuteAsync(InsertJob, ("@dedupe", "one"));
-            var second = uow.WriteTransaction();
+            var second = await uow.WriteTransactionAsync();
             await uow.ExecuteAsync(InsertJob, ("@dedupe", "two"));
 
             Assert.Same(first, second);
@@ -121,8 +121,8 @@ public sealed class UnitOfWorkLifecycleTests
         var uow = await UnitOfWork.OpenAsync(db.Database);
         await using (uow.ConfigureAwait(false))
         {
-            uow.BeginImmediate();
-            Assert.Throws<InvalidOperationException>(uow.BeginImmediate);
+            await uow.BeginImmediateAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(uow.BeginImmediateAsync);
             Assert.Throws<InvalidOperationException>(uow.BeginRead);
         }
     }
