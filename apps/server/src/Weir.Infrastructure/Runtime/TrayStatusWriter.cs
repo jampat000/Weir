@@ -1,0 +1,206 @@
+using System.Text;
+using System.Threading.Channels;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Weir.Core.Configuration;
+using Weir.Core.Settings;
+using Weir.Core.Time;
+using Weir.Infrastructure.Activity;
+using Weir.Infrastructure.MediaManagers;
+using Weir.Infrastructure.Processing;
+using Weir.Infrastructure.Settings;
+using Weir.Infrastructure.Sqlite;
+
+namespace Weir.Infrastructure.Runtime;
+
+/// <summary>
+/// Keeps <see cref="TrayStatus.FileName"/> in Weir's data folder true to what the tray shows: written once the server starts,
+/// again whenever the pause, the files waiting on a person or the media managers that do not answer change, and a last time
+/// when the server stops cleanly, saying it is no longer running. A burst of changes is read once, at most once a
+/// <see cref="Settle"/>, and the file is replaced (whole, then renamed into place) only when its contents differ.
+/// A reading or a write that fails is tried again after <see cref="RetryAfter"/>, so what is on show is never left as an earlier run
+/// wrote it, and nothing it does can stop the server.
+/// </summary>
+public sealed class TrayStatusWriter : BackgroundService
+{
+    /// <summary>The least time between one reading and the next, so a busy queue does not rewrite the file for every job.</summary>
+    public static readonly TimeSpan Settle = TimeSpan.FromSeconds(1);
+
+    /// <summary>How long to wait before a reading or a write that failed is tried again.</summary>
+    public static readonly TimeSpan RetryAfter = TimeSpan.FromSeconds(2);
+
+    /// <summary>How many times the file is written, and how far apart, when the rename is refused.</summary>
+    private const int WriteAttempts = 5;
+    private static readonly TimeSpan WriteRetryAfter = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>The data that makes up the status: the pause, the files that wait on a person (their jobs and scans move them), and the managers.</summary>
+    private static readonly HashSet<string> Topics = [DataTopics.Pause, DataTopics.Jobs, DataTopics.LibraryScan, DataTopics.Libraries, DataTopics.Connections];
+
+    private readonly WeirOptions _options;
+    private readonly SqliteDatabase _database;
+    private readonly SuiteSettingsStore _settings;
+    private readonly FileStateStore _files;
+    private readonly MediaManagerConnectionStore _managers;
+    private readonly DataChangePublisher _changes;
+    private readonly TimeProvider _time;
+    private readonly ILogger<TrayStatusWriter> _logger;
+    private readonly Channel<bool> _stale = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
+    private BroadcastSubscription<string>? _heard;
+    private TrayStatus? _status;
+    private string _written = string.Empty;
+
+    public TrayStatusWriter(
+        WeirOptions options,
+        SqliteDatabase database,
+        SuiteSettingsStore settings,
+        FileStateStore files,
+        MediaManagerConnectionStore managers,
+        DataChangePublisher changes,
+        TimeProvider time,
+        ILogger<TrayStatusWriter> logger)
+    {
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _database = database ?? throw new ArgumentNullException(nameof(database));
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
+        _managers = managers ?? throw new ArgumentNullException(nameof(managers));
+        _changes = changes ?? throw new ArgumentNullException(nameof(changes));
+        _time = time ?? throw new ArgumentNullException(nameof(time));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>Listens before the server starts answering, so a change made from then on is never missed.</summary>
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        _heard = _changes.Subscribe();
+        return base.StartAsync(cancellationToken);
+    }
+
+    /// <summary>Once the last reading is done, says in the file that the server has stopped.</summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        if (_status is { } last)
+        {
+            await WriteAsync(last with { ServerOk = false }, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    public override void Dispose()
+    {
+        _heard?.Dispose();
+        base.Dispose();
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await Task.WhenAll(ListenAsync(stoppingToken), KeepWrittenAsync(stoppingToken)).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // The server is stopping.
+        }
+    }
+
+    /// <summary>Marks the status stale whenever data it is made of changes; the reading itself is left to the loop that throttles it.</summary>
+    private async Task ListenAsync(CancellationToken stoppingToken)
+    {
+        await foreach (var topic in _heard!.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+        {
+            if (Topics.Contains(topic))
+            {
+                _stale.Writer.TryWrite(true);
+            }
+        }
+    }
+
+    /// <summary>Writes the status at once, then again after each settled change; a reading or a write that fails is tried again after <see cref="RetryAfter"/>.</summary>
+    private async Task KeepWrittenAsync(CancellationToken stoppingToken)
+    {
+        await ReadWriteAndRetryAsync(stoppingToken).ConfigureAwait(false);
+        await foreach (var _ in _stale.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+        {
+            await Task.Delay(Settle, stoppingToken).ConfigureAwait(false);
+            await ReadWriteAndRetryAsync(stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ReadWriteAndRetryAsync(CancellationToken stoppingToken)
+    {
+        if (!await ReadAndWriteAsync(stoppingToken).ConfigureAwait(false))
+        {
+            await Task.Delay(RetryAfter, stoppingToken).ConfigureAwait(false);
+            _stale.Writer.TryWrite(true);
+        }
+    }
+
+    private async Task<bool> ReadAndWriteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            var status = await ReadAsync(stoppingToken).ConfigureAwait(false);
+            _status = status;
+            return await WriteAsync(status, stoppingToken).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Nothing a reading does may stop the server; it is logged and tried again.
+        catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            _logger.LogWarning(exception, "Weir could not read what the tray shows about it; the tray may be a step behind until the next change.");
+            return false;
+        }
+    }
+
+    private async Task<TrayStatus> ReadAsync(CancellationToken stoppingToken)
+    {
+        var uow = await UnitOfWork.OpenAsync(_database, stoppingToken).ConfigureAwait(false);
+        await using (uow.ConfigureAwait(false))
+        {
+            var row = await _settings.GetAsync(uow).ConfigureAwait(false);
+            var pause = row is null ? null : PauseState.Resolve(row, Timestamp.UtcNow(_time).AsUtc);
+            var files = await _files.CountWaitingOnPersonAsync(uow).ConfigureAwait(false);
+            var managers = await _managers.ListEnabledAsync(uow).ConfigureAwait(false);
+            return new TrayStatus(
+                pause is { Paused: true },
+                pause is { Paused: true, PausedUntil: { } until } ? until.AsUtc : null,
+                files,
+                [.. managers.Where(manager => manager.LastTestOk == false).Select(manager => manager.Label)],
+                ServerOk: true);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the file when its contents differ. The tray may have it open to read when the new one is renamed into place, so a
+    /// refused rename is tried again a few times before it counts as failed.
+    /// </summary>
+    private async Task<bool> WriteAsync(TrayStatus status, CancellationToken cancellationToken)
+    {
+        var contents = status.ToJson();
+        if (contents == _written)
+        {
+            return true;
+        }
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                AtomicFileWriter.Replace(_options.WeirHome, TrayStatus.FileName, Encoding.UTF8.GetBytes(contents));
+                _written = contents;
+                return true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                if (attempt == WriteAttempts)
+                {
+                    _logger.LogWarning(exception, "Weir could not tell the tray how it is; the tray may be a step behind until the next change.");
+                    return false;
+                }
+            }
+
+            await Task.Delay(WriteRetryAfter, cancellationToken).ConfigureAwait(false);
+        }
+    }
+}

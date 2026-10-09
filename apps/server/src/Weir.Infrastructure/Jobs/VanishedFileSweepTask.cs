@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Weir.Core.Configuration;
 using Weir.Core.Jobs;
 using Weir.Core.Processing;
+using Weir.Infrastructure.Activity;
 using Weir.Infrastructure.Processing;
 using Weir.Infrastructure.Scheduling;
 using Weir.Infrastructure.Sqlite;
@@ -24,14 +25,16 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
     private readonly LibraryStore _libraries;
     private readonly TimeProvider _time;
     private readonly ILogger<VanishedFileSweepTask> _logger;
+    private readonly DataChangePublisher? _changes;
 
-    public VanishedFileSweepTask(SqliteDatabase database, WeirOptions options, LibraryStore libraries, TimeProvider time, ILogger<VanishedFileSweepTask> logger)
+    public VanishedFileSweepTask(SqliteDatabase database, WeirOptions options, LibraryStore libraries, TimeProvider time, ILogger<VanishedFileSweepTask> logger, DataChangePublisher? changes = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _libraries = libraries ?? throw new ArgumentNullException(nameof(libraries));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _changes = changes;
     }
 
     public string Name => "processing-vanished-file-sweep";
@@ -70,6 +73,9 @@ public sealed partial class VanishedFileSweepTask : IPeriodicTask
             {
                 // In the server log as well as Activity, so it can be checked on a machine where nobody signs in.
                 LogForgotten(forgotten.Count, library.Name, string.Join(", ", forgotten));
+
+                // A failed or held file that left the folder is no longer waiting on a person; no job moved to say so.
+                _changes?.Publish(DataTopics.Jobs);
             }
         }
     }
