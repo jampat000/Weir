@@ -68,15 +68,17 @@ static class RestartAfterSetup
         args.Contains(Argument) && anotherTrayRuns();
 
     /// <summary>
-    /// The PowerShell that waits for Setup and then starts the tray, with no window. A Setup that has already exited is not
-    /// waited for, and one that outlasts the ceiling is given up on rather than waited for forever.
+    /// The PowerShell that waits for Setup and then starts the tray, with no window. It is started through the shell, which
+    /// hands it no handles: a caller that captures Setup's output waits for every holder of Setup's pipes to close them, and
+    /// this PowerShell and the Weir it starts outlive Setup. A Setup that has already exited is not waited for, and one that
+    /// outlasts the ceiling is given up on rather than waited for forever.
     /// </summary>
     internal static ProcessStartInfo HelperStart(int setupProcessId, string executable)
     {
         var start = new ProcessStartInfo(PowerShellPath())
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
         };
         foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", HelperScript(setupProcessId, executable) })
         {
