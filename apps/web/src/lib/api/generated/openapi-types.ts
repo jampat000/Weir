@@ -4934,6 +4934,11 @@ export interface components {
        */
       size_changed_at?: string | null;
       /**
+       * Skip Kind
+       * @description Why a skipped file was skipped, as a code: below_minimum_size is the workflow's minimum size doing its job. Null for any other skip, and for a file that is not skipped.
+       */
+      skip_kind?: string | null;
+      /**
        * Source Gone
        * @description True while Weir holds a file that is no longer in the watched folder, before it stops listing it. Nothing that needs the file can be done to it.
        */

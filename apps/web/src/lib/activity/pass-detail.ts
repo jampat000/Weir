@@ -63,6 +63,18 @@ export type FileProgressDetail = {
   reason?: string | null;
 };
 
+/**
+ * Whether a pass finished nothing: it was skipped, or waited for a file that was not ready, or the file was gone. It wrote no
+ * output and checked that none was needed, so it is never a cleaned file, whatever its reason.
+ */
+export function finishedNothing(outcome: string | null | undefined): boolean {
+  return (
+    outcome === "skipped_guardrail" ||
+    outcome === "source_not_ready" ||
+    outcome === "source_gone"
+  );
+}
+
 /** A rejection by the rules with no media manager involved: a decision, not a failure. */
 export function isRejectedByRules(
   detail: { rejected_without_manager?: unknown } | null | undefined,

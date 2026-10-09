@@ -35,7 +35,8 @@ public sealed record ActivityFilter(
     long? LibraryId = null,
     string? File = null,
     string? About = null,
-    bool KnownFilesOnly = false)
+    bool KnownFilesOnly = false,
+    bool CurrentOnly = false)
 {
     public static readonly ActivityFilter None = new();
 }

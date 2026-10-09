@@ -51,7 +51,7 @@ export function useRecentWork(now: number): RecentWork | undefined {
   });
   const date_from = recentSince(now);
   const passes = useActivityWindowQuery(
-    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from },
+    { event_type: REMUX_PASS_COMPLETED_EVENT, date_from, current_only: true },
     ONE_PAGE,
   ).data;
   const cleans = useActivityWindowQuery(

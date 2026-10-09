@@ -2,11 +2,12 @@ import { useState } from "react";
 import { ChooseTracksPanel } from "../../components/processing/choose-tracks-panel";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { errorMessage } from "../../lib/api/error-message";
-import type {
-  ProcessingFile,
-  ProcessingFileStatus,
-  ProcessingFileTracks,
-  ProcessingManualPlanChoice,
+import {
+  wasRemovedBelowMinimumSize,
+  type ProcessingFile,
+  type ProcessingFileStatus,
+  type ProcessingFileTracks,
+  type ProcessingManualPlanChoice,
 } from "../../lib/processing/files-api";
 import {
   useMoveProcessingFileToTop,
@@ -135,8 +136,10 @@ export function ActivityFileActions({
   }
 
   const status = file.status;
-  // A file Weir has found gone has nothing to choose tracks for, check again or pass through: only forgetting it is left.
-  const hasFile = file.source_gone !== true;
+  // A file Weir has found gone, or one the workflow removed for being under its minimum size, has nothing left to choose tracks
+  // for, check again, process or pass through: only forgetting it is left.
+  const hasFile =
+    file.source_gone !== true && !wasRemovedBelowMinimumSize(file);
   const queueAgain = () =>
     void run(
       async () => (await requeue.mutateAsync(file.id)).detail,
@@ -177,7 +180,7 @@ export function ActivityFileActions({
               { pending: requeue.isPending, pendingLabel: "Queueing…" },
             )
           : null}
-        {CONCLUDED.includes(status)
+        {CONCLUDED.includes(status) && hasFile
           ? button(
               "Process again",
               "Queues this file to be processed again, from its original in the watched folder.",

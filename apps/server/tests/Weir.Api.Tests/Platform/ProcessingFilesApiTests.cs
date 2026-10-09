@@ -252,6 +252,157 @@ public sealed class ProcessingFilesApiTests
         Assert.Equal(1, await TestDatabase.ScalarAsync(server, "SELECT count(*) FROM jobs WHERE dedupe_key = $dedupe", ("$dedupe", dedupeKey)));
     }
 
+    [Fact]
+    public async Task A_file_skipped_under_the_minimum_size_says_so_with_a_code_and_any_other_skip_has_none()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Film/Gallery.mkv", "skipped");
+        await SeedFileAsync(server, libraryId, "Film/Huge.mkv", "skipped");
+        await TestDatabase.ExecuteAsync(server, "UPDATE files SET skip_kind = 'below_minimum_size' WHERE relative_path = 'Film/Gallery.mkv'");
+
+        using var response = await client.GetAsync("/api/v1/processing/files?file_status=skipped");
+
+        var kinds = (await ApiTestClient.Json(response))!["files"]!.AsArray()
+            .ToDictionary(file => file!["relative_path"]!.GetValue<string>(), file => file!["skip_kind"]?.GetValue<string>());
+        Assert.Equal("below_minimum_size", kinds["Film/Gallery.mkv"]);
+        Assert.Null(kinds["Film/Huge.mkv"]);
+    }
+
+    private static async Task RecordPassAsync(WeirTestServer server, long libraryId, string relativePath, string title, bool ok)
+    {
+        var writer = server.Services.GetRequiredService<IActivityWriter>();
+        await writer.RecordAsync(new ActivityEventDraft(
+            ActivityEventTypes.ProcessingFileRemuxPassCompleted,
+            "processing",
+            title,
+            $"{{\"library_id\": {libraryId}, \"relative_media_path\": \"{relativePath}\", \"ok\": {(ok ? "true" : "false")}, \"outcome\": \"{(ok ? "live_output_written" : "failed_during_execution")}\"}}"));
+    }
+
+    /// <summary>A pass that finished nothing: its file was skipped, as the pass records it (result skipped, ok true).</summary>
+    private static async Task RecordSkippedPassAsync(WeirTestServer server, long libraryId, string relativePath, string title)
+    {
+        var writer = server.Services.GetRequiredService<IActivityWriter>();
+        await writer.RecordAsync(new ActivityEventDraft(
+            ActivityEventTypes.ProcessingFileRemuxPassCompleted,
+            "processing",
+            title,
+            $"{{\"library_id\": {libraryId}, \"relative_media_path\": \"{relativePath}\", \"ok\": true, \"outcome\": \"skipped_guardrail\", \"result\": \"skipped\"}}"));
+    }
+
+    [Fact]
+    public async Task A_later_skip_does_not_replace_the_pass_that_cleaned_the_file()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Film/film.mkv", "processed");
+        await RecordPassAsync(server, libraryId, "Film/film.mkv", "Film cleaned", ok: true);
+        await RecordSkippedPassAsync(server, libraryId, "Film/film.mkv", "Film skipped");
+
+        Assert.Equal(["Film cleaned"], await PassTitlesAsync(client, "&current_only=true"));
+        Assert.Equal(2, (await PassTitlesAsync(client, string.Empty)).Length);
+    }
+
+    [Fact]
+    public async Task A_film_with_many_skipped_extras_still_fills_the_page_with_the_film_and_counts_only_it()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Film/film.mkv", "processed");
+        await RecordPassAsync(server, libraryId, "Film/film.mkv", "Film cleaned", ok: true);
+        foreach (var extra in Enumerable.Range(1, 6))
+        {
+            await RecordSkippedPassAsync(server, libraryId, $"Film/extra{extra}.mkv", $"Extra {extra} skipped");
+        }
+
+        Assert.Equal(["Film cleaned"], await PassTitlesAsync(client, "&current_only=true&limit=3"));
+        using var response = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted + "&current_only=true");
+        Assert.Equal(1, (await ApiTestClient.Json(response))!["total"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task A_list_that_shows_no_count_can_ask_for_none()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+
+        using var counted = await client.GetAsync("/api/v1/activity/recent");
+        using var uncounted = await client.GetAsync("/api/v1/activity/recent?with_total=false");
+
+        Assert.NotNull((await ApiTestClient.Json(counted))!["total"]);
+        Assert.Null((await ApiTestClient.Json(uncounted))!["total"]);
+    }
+
+    private static async Task<string[]> PassTitlesAsync(ApiTestClient client, string query)
+    {
+        using var response = await client.GetAsync("/api/v1/activity/recent?event_type=" + ActivityEventTypes.ProcessingFileRemuxPassCompleted + query);
+        return [.. (await ApiTestClient.Json(response))!["items"]!.AsArray().Select(item => item!["title"]!.GetValue<string>())];
+    }
+
+    /// <summary>
+    /// A list of what finished asks for <c>current_only</c>, and sees each file as it stands now: a pass that a later pass of the
+    /// same file replaces, and a failure of a file that has since been processed, are left out, and a file that is still failed
+    /// keeps its failure. System's log never asks, and keeps every entry.
+    /// </summary>
+    [Fact]
+    public async Task The_current_list_shows_each_file_as_it_stands_now_and_the_log_keeps_every_entry()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Retried/retried.mkv", "processed");
+        await SeedFileAsync(server, libraryId, "Settled/settled.mkv", "processed");
+        await SeedFileAsync(server, libraryId, "Broken/broken.mkv", "processing_failed");
+        await SeedFileAsync(server, libraryId, "Again/again.mkv", "processed");
+        await RecordPassAsync(server, libraryId, "Again/again.mkv", "Again first pass", ok: true);
+        await RecordPassAsync(server, libraryId, "Retried/retried.mkv", "Retried first try", ok: false);
+        await RecordPassAsync(server, libraryId, "Retried/retried.mkv", "Retried second try", ok: true);
+        await RecordPassAsync(server, libraryId, "Settled/settled.mkv", "Settled delivered", ok: true);
+        await RecordPassAsync(server, libraryId, "Settled/settled.mkv", "Settled reported failed", ok: false);
+        await RecordPassAsync(server, libraryId, "Broken/broken.mkv", "Broken failed", ok: false);
+
+        await RecordPassAsync(server, libraryId, "Again/again.mkv", "Again second pass", ok: true);
+
+        Assert.Equal(
+            ["Again second pass", "Broken failed", "Retried second try", "Settled delivered"],
+            (await PassTitlesAsync(client, "&current_only=true")).Order(StringComparer.Ordinal));
+        Assert.Equal(7, (await PassTitlesAsync(client, string.Empty)).Length);
+    }
+
+    /// <summary>
+    /// The list follows the file: once the file is processed, its recorded failure is no longer the answer, with nothing deleted.
+    /// </summary>
+    [Fact]
+    public async Task A_failure_stops_being_listed_once_the_file_is_processed_and_the_entry_is_still_in_the_log()
+    {
+        await using var server = await ApiTestClient.StartServerAsync();
+        await TestDatabase.SeedAdminAsync(server);
+        var client = new ApiTestClient(server);
+        await client.SignInAsync();
+        var libraryId = await SeedLibraryAsync(server);
+        await SeedFileAsync(server, libraryId, "Film/film.mkv", "processing_failed");
+        await RecordPassAsync(server, libraryId, "Film/film.mkv", "Film could not be processed", ok: false);
+        Assert.Equal(["Film could not be processed"], await PassTitlesAsync(client, "&current_only=true"));
+
+        await TestDatabase.ExecuteAsync(server, "UPDATE files SET status = 'processed' WHERE relative_path = 'Film/film.mkv'");
+
+        Assert.Empty(await PassTitlesAsync(client, "&current_only=true"));
+        Assert.Equal(["Film could not be processed"], await PassTitlesAsync(client, string.Empty));
+    }
+
     /// <summary>
     /// The overview's processed/failed counts, output-written total and space saved are lifetime statistics —
     /// "Weir has saved X GB" — the same kind of fact System › Logs keeps whether or not a title is still in

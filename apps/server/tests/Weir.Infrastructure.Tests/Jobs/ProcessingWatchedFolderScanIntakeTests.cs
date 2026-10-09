@@ -43,6 +43,7 @@ public sealed class ProcessingWatchedFolderScanIntakeTests
         var file = await WatchedFolderScanFixture.FileAsync(store, libraryId);
         Assert.Equal(ProcessingFileStatuses.Skipped, file.Status);
         Assert.Contains("under the 1 MB minimum", file.StatusReason, StringComparison.Ordinal);
+        Assert.Equal(SkipKinds.BelowMinimumSize, file.SkipKind);
     }
 
     [Fact]

@@ -44,11 +44,11 @@ public sealed partial class FileStateStore
         "video_codec, audio_track_count, subtitle_track_count, duration_seconds, audio_codecs, video_bit_depth, size_changed_at, " +
         "hold_until, failure_class, failure_attempts, next_retry_at, output_collision_policy, output_collision_action, " +
         "output_collision_reason, hardware_method, hardware_fell_back_to_software, hardware_reason, last_seen_at, last_attempt_at, " +
-        "created_at, updated_at, processed_source_size, processed_source_mtime_ns, fingerprint_size_bytes, fingerprint_mtime_ns";
+        "created_at, updated_at, processed_source_size, processed_source_mtime_ns, fingerprint_size_bytes, fingerprint_mtime_ns, skip_kind";
     private const string InsertSql =
         "INSERT INTO files (library_id, relative_path, status, status_reason, blocked_by_connection, hold_until, " +
-        "size_bytes, size_changed_at, last_seen_at, last_attempt_at) VALUES (@lib, @path, @status, @reason, @blocked, @hold, " +
-        "@size, @size_changed, @seen, @attempt)";
+        "size_bytes, size_changed_at, last_seen_at, last_attempt_at, skip_kind) VALUES (@lib, @path, @status, @reason, @blocked, @hold, " +
+        "@size, @size_changed, @seen, @attempt, @skip_kind)";
 
     public Task<ProcessingFileRecord?> GetAsync(UnitOfWork uow, long id) =>
         uow.QuerySingleAsync($"SELECT {Columns} FROM files WHERE id = @id", Read, ("@id", id));
@@ -235,11 +235,14 @@ public sealed partial class FileStateStore
 
     /// <summary>Moves a file Weir has already seen into a new state. Does nothing when the row does not
     /// exist.</summary>
-    public async Task MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason)
+    public async Task MarkFileStatusAsync(UnitOfWork uow, long libraryId, string relativePath, string status, string reason, string? skipKind = null)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        var sets = new List<string> { "status = @status", "status_reason = @reason", "updated_at = CURRENT_TIMESTAMP" };
-        var parameters = new List<(string, object?)> { ("@status", status), ("@reason", reason), ("@lib", libraryId), ("@path", relativePath) };
+        var sets = new List<string> { "status = @status", "status_reason = @reason", "skip_kind = @skip_kind", "updated_at = CURRENT_TIMESTAMP" };
+        var parameters = new List<(string, object?)>
+        {
+            ("@status", status), ("@reason", reason), ("@skip_kind", skipKind), ("@lib", libraryId), ("@path", relativePath),
+        };
         if (status is ProcessingFileStatuses.Processing or ProcessingFileStatuses.Processed or ProcessingFileStatuses.ProcessingFailed)
         {
             sets.Add("last_attempt_at = CURRENT_TIMESTAMP");
@@ -301,6 +304,7 @@ public sealed partial class FileStateStore
         ProcessedSourceMtimeNs = reader.IsDBNull(31) ? null : reader.GetInt64(31),
         FingerprintSizeBytes = reader.IsDBNull(32) ? null : reader.GetInt64(32),
         FingerprintMtimeNs = reader.IsDBNull(33) ? null : reader.GetInt64(33),
+        SkipKind = SqliteValues.GetStringOrNull(reader, 34),
     };
 
     /// <summary>One state write's values, shared by the upsert and the scan's conditional write.</summary>
@@ -320,6 +324,7 @@ public sealed partial class FileStateStore
             ("@size_changed", ChangedAt),
             ("@seen", SqliteValues.ToSqlite(Seen)),
             ("@attempt", IsAttempt ? SqliteValues.ToSqlite(Seen) : null),
+            ("@skip_kind", Verdict.SkipKind),
         ];
 
         /// <summary>The <c>SET</c> list for an existing row: a size or change time of null leaves the stored value alone.</summary>
@@ -328,7 +333,7 @@ public sealed partial class FileStateStore
             var sets = new List<string>
             {
                 "status = @status", "status_reason = @reason", "blocked_by_connection = @blocked", "hold_until = @hold",
-                "last_seen_at = @seen", "updated_at = CURRENT_TIMESTAMP",
+                "last_seen_at = @seen", "updated_at = CURRENT_TIMESTAMP", "skip_kind = @skip_kind",
             };
             var parameters = new List<(string Name, object? Value)>
             {
@@ -337,6 +342,7 @@ public sealed partial class FileStateStore
                 ("@blocked", Verdict.BlockedByConnection),
                 ("@hold", HoldUntil),
                 ("@seen", SqliteValues.ToSqlite(Seen)),
+                ("@skip_kind", Verdict.SkipKind),
             };
             if (SizeBytes is { } size)
             {

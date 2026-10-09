@@ -24,23 +24,58 @@ const PROCESSING_FILE_STATUS_LABELS: Record<ProcessingFileStatus, string> = {
 /** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */
 export const REJECTED_BY_RULES = "rules";
 
-/** The plain word for a file's state. A rejection no media manager was asked about is just "Rejected". */
+/** The codes the server records for a skip under the workflow's minimum size (`SkipKinds`), and for one whose file it then removed. */
+const BELOW_MINIMUM_SIZE = "below_minimum_size";
+const BELOW_MINIMUM_SIZE_REMOVED = "below_minimum_size_removed";
+
+/** Whether the workflow's minimum size skipped the file: that is the minimum doing its job, and needs nobody. */
+export function isBelowMinimumSize(
+  file: Pick<ProcessingFile, "status" | "skip_kind">,
+): boolean {
+  return (
+    file.status === "skipped" &&
+    (file.skip_kind === BELOW_MINIMUM_SIZE ||
+      file.skip_kind === BELOW_MINIMUM_SIZE_REMOVED)
+  );
+}
+
+/** Whether the workflow, set to delete rejected files, removed the file for being under its minimum size: there is nothing left to act on. */
+export function wasRemovedBelowMinimumSize(
+  file: Pick<ProcessingFile, "status" | "skip_kind">,
+): boolean {
+  return (
+    file.status === "skipped" && file.skip_kind === BELOW_MINIMUM_SIZE_REMOVED
+  );
+}
+
+/**
+ * The plain word for a file's state. A rejection no media manager was asked about is just "Rejected", and a file
+ * removed for being under the minimum size is "Removed".
+ */
 export function processingFileStatusLabel(
-  file: Pick<ProcessingFile, "status" | "failure_class">,
+  file: Pick<ProcessingFile, "status" | "failure_class" | "skip_kind">,
 ): string {
   if (file.status === "rejected" && file.failure_class === REJECTED_BY_RULES) {
     return "Rejected";
   }
+  if (wasRemovedBelowMinimumSize(file)) return "Removed";
   return PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status;
 }
 
 /** The state and its reason as one lead. A reason that already opens with the state's word ("Rejected: …") stands alone. */
 export function processingFileLead(
-  file: Pick<ProcessingFile, "status" | "failure_class" | "status_reason">,
+  file: Pick<
+    ProcessingFile,
+    "status" | "failure_class" | "status_reason" | "skip_kind"
+  >,
 ): string {
   const label = processingFileStatusLabel(file);
+  if (wasRemovedBelowMinimumSize(file)) {
+    return `${label}: under the workflow's minimum size.`;
+  }
   if (!file.status_reason) return label;
-  return file.status_reason.startsWith(`${label}:`)
+  // A reason that opens with the state's own word ("Rejected: …", "Skipped because …") stands alone.
+  return file.status_reason.toLowerCase().startsWith(label.toLowerCase())
     ? file.status_reason
     : `${label}. ${file.status_reason}`;
 }
@@ -93,6 +128,8 @@ export interface ProcessingFile {
   blocked_by_connection: string | null;
   size_bytes: number;
   failure_class: string | null;
+  /** Why a skipped file was skipped, as a code (`below_minimum_size`); null for any other skip, and for a file not skipped. */
+  skip_kind?: string | null;
   failure_attempts: number;
   next_retry_at: string | null;
   /** The collision policy in force and what it decided, kept on the file rather than only in an activity note. */

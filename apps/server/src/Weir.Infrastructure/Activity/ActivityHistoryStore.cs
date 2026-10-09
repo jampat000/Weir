@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Weir.Core.Activity;
+using Weir.Core.Processing;
 using Weir.Core.Time;
 using Weir.Infrastructure.Sqlite;
 
@@ -23,6 +24,28 @@ public sealed class ActivityHistoryStore
 
     /// <summary>How far a stored time's written date can be from its UTC date (a UTC offset is at most 14 hours).</summary>
     private static readonly TimeSpan StoredDateSlack = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Keeps, of the events about one file, only the newest one that still describes it, so a list of what finished shows
+    /// each file as it stands now. An event that finished nothing (a skip) describes no file, and a recorded failure stops
+    /// describing a file once the file has been processed or passed through; an event is passed over when a newer one of the
+    /// same kind still describes the file. Events about no file stay. The history itself is untouched.
+    /// </summary>
+    private static readonly string CurrentOnlyClause =
+        "(coalesce(activity_events.relative_path, '') = '' OR (" +
+        Describes("activity_events") +
+        " AND NOT EXISTS (SELECT 1 FROM activity_events newer WHERE newer.event_type = activity_events.event_type " +
+        "AND newer.relative_path = activity_events.relative_path AND newer.library_id IS activity_events.library_id " +
+        "AND newer.id > activity_events.id AND " + Describes("newer") + ")))";
+
+    /// <summary>
+    /// Whether the event under <paramref name="alias"/> describes its file as it stands: it is not a skip, and not a failure of a
+    /// file that has since been processed or passed through.
+    /// </summary>
+    private static string Describes(string alias) =>
+        $"(coalesce({alias}.result, '') <> 'skipped' AND (coalesce({alias}.result, '') <> 'failed' OR NOT EXISTS (" +
+        $"SELECT 1 FROM files WHERE files.relative_path = {alias}.relative_path AND files.library_id = {alias}.library_id " +
+        $"AND files.status IN ('{ProcessingFileStatuses.Processed}', '{ProcessingFileStatuses.PassedThrough}'))))";
 
     internal const string Columns =
         "activity_events.id, activity_events.created_at, activity_events.event_type, activity_events.module, activity_events.title, " +
@@ -214,6 +237,11 @@ public sealed class ActivityHistoryStore
             where.Add(
                 "(coalesce(activity_events.relative_path, '') = '' OR EXISTS (" +
                 "SELECT 1 FROM files WHERE files.relative_path = activity_events.relative_path AND files.library_id = activity_events.library_id))");
+        }
+
+        if (filter.CurrentOnly)
+        {
+            where.Add(CurrentOnlyClause);
         }
 
         if (!string.IsNullOrEmpty(filter.File))

@@ -1,4 +1,8 @@
-import type { ProcessingFile } from "../../lib/processing/files-api";
+import {
+  isBelowMinimumSize,
+  wasRemovedBelowMinimumSize,
+  type ProcessingFile,
+} from "../../lib/processing/files-api";
 
 /** A file checked while processing was paused carries that reason until something looks at it again. */
 function pausedWhenChecked(file: ProcessingFile): boolean {
@@ -47,6 +51,18 @@ const BY_STATUS: Partial<Record<ProcessingFile["status"], Guidance>> = {
   },
 };
 
+/** A file under the workflow's minimum size: the minimum doing its job, which skips samples and extras. */
+const BELOW_MINIMUM_SIZE: Guidance = {
+  title: "This is the workflow's minimum size doing its job.",
+  next: "Weir skips files this small, such as samples and extras, so there is nothing to do. Use Pass through unchanged only if you do want it delivered.",
+};
+
+/** The same file in a workflow that deletes the files its rules refuse: it is gone, so nothing can be done with it. */
+const REMOVED_BELOW_MINIMUM_SIZE: Guidance = {
+  title: "This is the workflow's minimum size doing its job.",
+  next: "This workflow deletes files its rules refuse, so this one was removed from the watched folder. There is nothing to do.",
+};
+
 /** A failed file with a retry still owed: Weir looks again by itself once the wait is over. */
 const RETRY_OWED: Guidance = {
   title: "This attempt failed, and Weir will try again.",
@@ -79,5 +95,7 @@ export function fileGuidance(
   if (file.status === "processing_failed" && file.next_retry_at) {
     return RETRY_OWED;
   }
+  if (wasRemovedBelowMinimumSize(file)) return REMOVED_BELOW_MINIMUM_SIZE;
+  if (isBelowMinimumSize(file)) return BELOW_MINIMUM_SIZE;
   return BY_STATUS[file.status] ?? NO_GUIDANCE;
 }

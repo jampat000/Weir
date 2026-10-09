@@ -128,6 +128,8 @@ public sealed class SchemaMigrator
         new(39, "0074_schema_version_table", "Weir.Infrastructure.Migrations.0039_schema_version_table.sql"),
         new(40, "0075_handoff_target_copy", "Weir.Infrastructure.Migrations.0040_handoff_target_copy.sql"),
         new(41, "0076_handoff_skipped_extras", "Weir.Infrastructure.Migrations.0041_handoff_skipped_extras.sql"),
+        new(42, "0077_file_skip_kind", "Weir.Infrastructure.Migrations.0042_file_skip_kind.sql"),
+        new(43, "0078_activity_current_index", "Weir.Infrastructure.Migrations.0043_activity_current_index.sql"),
     ];
 
     /// <summary>The first migration's revision: the oldest schema this build can start from.</summary>
