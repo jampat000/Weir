@@ -316,7 +316,9 @@ public sealed partial class MediaManagerIntake
         }
 
         var relativePath = resolved.RelativeMediaPath!;
-        var targets = HandoffMediaFiles(library, relativePath);
+        var targets = importEvent.SourceFiles is { Count: > 0 } && library is not null
+            ? HandoffListedFiles(library, relativePath, importEvent)
+            : HandoffMediaFiles(library, relativePath);
         var baseKey = IntakeRules.BaseDedupeKey(importEvent, NewGuid);
         var covered = new List<string>(targets.Count);
         // #786 review of #785: a target someone chose to keep must not be reprocessed just because a manager

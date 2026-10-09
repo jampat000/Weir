@@ -65,6 +65,21 @@ manager link.
   which release lets it check; with a key that lacks the permission it says how to
   fix that. A hand-off is still accepted only when its path, as Deluno sends it,
   is inside the watched folder.
+
+  A hand-off may carry an optional `sourceFiles`: an array of absolute file
+  paths, as Weir sees them, each inside the hand-off's `sourcePath`. Deluno
+  sends it when a release folder holds files under the workflow's minimum file
+  size (`minimum_file_size_bytes` in `GET /api/v1/intake/library-folders`), and
+  lists only the files at or above it. When it is present and not empty, the
+  hand-off means those files and nothing else in the folder: Weir still applies
+  the workflow's own rules (minimum size, patterns and so on) to each one, but
+  the files that are not listed are not recorded, shown, reported as skipped or
+  touched, so they stay in the download folder for seeding. A listed path that
+  is outside `sourcePath` (after `.` and `..` are settled, ignoring case on
+  Windows), or a file that is not there, refuses the whole hand-off with
+  status 400 and a plain reason naming the file; Weir does not fall back to the
+  whole folder. An absent, `null` or empty `sourceFiles` means the whole
+  folder, as before.
 - **Sonarr and Radarr** are set up by hand, the way FileFlows documents it: the
   download client finishes into Weir's watched folder, and a remote path mapping
   in Sonarr/Radarr (Settings › Download Clients › Remote Path Mappings) maps that

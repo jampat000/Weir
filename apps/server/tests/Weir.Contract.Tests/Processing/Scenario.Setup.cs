@@ -106,22 +106,29 @@ internal sealed partial class Scenario
     }
 
 
-    /// <summary>A hand-off from the fake Deluno: it names a file or release folder, and Weir queues it.</summary>
-    public async Task<JsonObject> PostHandoffAsync(string handoffId, string sourcePath, string releaseName = "Contract.Release.2024")
+    /// <summary>
+    /// A hand-off from the fake Deluno: it names a file or release folder, and Weir queues it. <paramref name="sourceFiles"/>, when
+    /// given, lists the only files in the folder it means.
+    /// </summary>
+    public async Task<JsonObject> PostHandoffAsync(
+        string handoffId, string sourcePath, string releaseName = "Contract.Release.2024", IEnumerable<string>? sourceFiles = null)
     {
-        var accepted = await Admin.PostAsync(
-            $"{Api}/intake/webhook/deluno",
-            new JsonObject
-            {
-                ["eventType"] = "deluno.processor-handoff",
-                ["handoffId"] = handoffId,
-                ["libraryId"] = DelunoLibraryKey,
-                ["mediaType"] = "movies",
-                ["sourcePath"] = sourcePath,
-                ["releaseName"] = releaseName,
-                ["callbackPath"] = EventsPath,
-            },
-            SecretHeader);
+        var body = new JsonObject
+        {
+            ["eventType"] = "deluno.processor-handoff",
+            ["handoffId"] = handoffId,
+            ["libraryId"] = DelunoLibraryKey,
+            ["mediaType"] = "movies",
+            ["sourcePath"] = sourcePath,
+            ["releaseName"] = releaseName,
+            ["callbackPath"] = EventsPath,
+        };
+        if (sourceFiles is not null)
+        {
+            body["sourceFiles"] = new JsonArray([.. sourceFiles.Select(file => (JsonNode?)JsonValue.Create(file))]);
+        }
+
+        var accepted = await Admin.PostAsync($"{Api}/intake/webhook/deluno", body, SecretHeader);
         Assert.True(accepted.Status == HttpStatusCode.OK, accepted.ToString());
         return accepted.Fields;
     }
