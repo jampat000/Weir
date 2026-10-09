@@ -10,6 +10,7 @@ Earlier version numbers were retired when Weir restarted at 1.0.0-rc.1. Their hi
 
 ## 1.x
 
+- **1.0.0-rc.11** (2026-10-09). The update check works when GitHub limits your network, the tray matches Deluno's, Weir stays quick while it processes, and files deleted or finished by hand-off settle instead of waiting. [notes](docs/release-notes/v1.0.0-rc.11.md) · [release](https://github.com/jampat000/Weir/releases/tag/v1.0.0-rc.11)
 - **1.0.0-rc.10** (2026-10-09). Logs speak plainly, no warning at every start, Docker folders readable again, and a newer FFmpeg build. [notes](docs/release-notes/v1.0.0-rc.10.md) · [release](https://github.com/jampat000/Weir/releases/tag/v1.0.0-rc.10)
 - **1.0.0-rc.9** (2026-10-09, tagged but not published; its changes are in rc.10). Logs speak plainly, and no warning at every start. [notes](docs/release-notes/v1.0.0-rc.9.md)
 - **1.0.0-rc.8** (2026-10-08). No guessed folders, unreadable files are never deleted or passed on, and plain words throughout. [notes](docs/release-notes/v1.0.0-rc.8.md) · [release](https://github.com/jampat000/Weir/releases/tag/v1.0.0-rc.8)
