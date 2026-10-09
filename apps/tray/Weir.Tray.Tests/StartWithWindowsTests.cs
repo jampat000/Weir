@@ -47,6 +47,19 @@ public sealed class StartWithWindowsTests : IDisposable
     }
 
     [Fact]
+    public void The_menu_tick_switches_it_on_and_then_off()
+    {
+        var registration = Registration();
+
+        registration.Toggle();
+        Assert.True(registration.IsEnabled);
+
+        registration.Toggle();
+        Assert.False(registration.IsEnabled);
+        Assert.Null(RunValue());
+    }
+
+    [Fact]
     public void Turning_it_off_removes_the_entry()
     {
         var registration = Registration();

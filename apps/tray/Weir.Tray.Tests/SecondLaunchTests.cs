@@ -20,12 +20,39 @@ public sealed class SecondLaunchTests : IDisposable
     [Fact]
     public void A_second_launch_reaches_the_running_tray_each_time()
     {
-        using var listening = new SecondLaunchSignal(() => _heard.Release(), _name);
+        using var listening = new SecondLaunchSignal(_name);
+        listening.Subscribe(() => _heard.Release());
 
         SecondLaunchSignal.Raise(_name);
         Assert.True(_heard.Wait(Ceiling));
         SecondLaunchSignal.Raise(_name);
         Assert.True(_heard.Wait(Ceiling));
+    }
+
+    [Fact]
+    public void A_second_launch_before_the_tray_has_an_icon_is_kept_and_told_when_it_has()
+    {
+        using var listening = new SecondLaunchSignal(_name);
+
+        SecondLaunchSignal.Raise(_name);
+        SpinWait.SpinUntil(() => listening.HasUndelivered, Ceiling);
+        listening.Subscribe(() => _heard.Release());
+
+        Assert.True(_heard.Wait(Ceiling));
+    }
+
+    [Fact]
+    public void A_second_launch_is_told_once_to_a_tray_that_subscribes_late_and_not_again()
+    {
+        using var listening = new SecondLaunchSignal(_name);
+        SecondLaunchSignal.Raise(_name);
+        SpinWait.SpinUntil(() => listening.HasUndelivered, Ceiling);
+        listening.Subscribe(() => _heard.Release());
+        Assert.True(_heard.Wait(Ceiling));
+
+        listening.Subscribe(() => _heard.Release());
+
+        Assert.False(_heard.Wait(TimeSpan.FromMilliseconds(200)));
     }
 
     [Fact]
@@ -56,13 +83,5 @@ public sealed class SecondLaunchTests : IDisposable
         Program.HandOverToRunningTray(["--no-browser", "--silent"], () => told = true);
 
         Assert.False(told);
-    }
-
-    [Fact]
-    public void A_second_launch_opens_no_browser()
-    {
-        Program.HandOverToRunningTray([], () => { });
-
-        Assert.DoesNotContain("Opening Weir in browser", File.ReadAllText(Path.Combine(_home.Path, "tray-host.log")), StringComparison.Ordinal);
     }
 }

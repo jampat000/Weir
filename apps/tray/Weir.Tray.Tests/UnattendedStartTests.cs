@@ -28,21 +28,21 @@ public sealed class UnattendedStartTests
     }
 
     [Fact]
-    public void Silent_does_not_open_the_browser()
+    public void Silent_does_not_announce_itself()
     {
-        Assert.False(Program.OpensBrowser(["--silent"]));
+        Assert.False(Program.AnnouncesStart(["--silent"]));
     }
 
     [Fact]
-    public void Silent_with_a_port_still_does_not_open_the_browser()
+    public void Silent_with_a_port_still_does_not_announce_itself()
     {
-        Assert.False(Program.OpensBrowser(["--port", "9400", "--silent"]));
+        Assert.False(Program.AnnouncesStart(["--port", "9400", "--silent"]));
     }
 
     [Fact]
-    public void Without_silent_the_browser_still_opens_by_default()
+    public void Without_silent_the_start_is_announced_by_default()
     {
-        Assert.True(Program.OpensBrowser(["--port", "9400"]));
+        Assert.True(Program.AnnouncesStart(["--port", "9400"]));
     }
 
     [Fact]

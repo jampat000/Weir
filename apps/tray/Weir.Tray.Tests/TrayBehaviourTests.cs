@@ -1,11 +1,16 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
 namespace Weir.Tray.Tests;
 
 /// <summary>Clicks, balloons and the folders the menu opens.</summary>
-public sealed class TrayBehaviourTests
+public sealed class TrayBehaviourTests : IDisposable
 {
+    private readonly TempDirectory _home = TempDirectory.AsWeirHome();
+
+    public void Dispose() => _home.Dispose();
+
     [Fact]
     public void A_click_and_the_double_click_that_follows_it_open_Weir_once()
     {
@@ -77,5 +82,49 @@ public sealed class TrayBehaviourTests
         Assert.Equal("1.0.0", AppVersion.Without("1.0.0"));
         Assert.Equal("unknown", AppVersion.Without(null));
         Assert.DoesNotContain('+', AppVersion.Current);
+    }
+
+    [Fact]
+    public void A_start_a_person_made_offers_the_address_to_open_and_opens_nothing()
+    {
+        Assert.Equal("Weir is running at http://localhost:9347. Click to open it.", TrayBalloons.RunningText(9347));
+    }
+
+    [Fact]
+    public void Showing_a_file_asks_Explorer_to_select_it()
+    {
+        var log = Path.Combine(_home.Path, "tray-host.log");
+        File.WriteAllText(log, "x");
+        ProcessStartInfo? started = null;
+
+        RuntimeFolders.Reveal(log, info => started = info);
+
+        Assert.NotNull(started);
+        Assert.Equal("explorer.exe", started.FileName);
+        Assert.Equal($"/select,\"{log}\"", started.Arguments);
+    }
+
+    [Fact]
+    public void A_file_that_is_not_there_opens_its_folder_instead_of_selecting_it()
+    {
+        ProcessStartInfo? started = null;
+        var missing = Path.Combine(_home.Path, "tray-host.log");
+
+        RuntimeFolders.Reveal(missing, info => started = info);
+
+        Assert.NotNull(started);
+        Assert.Equal(_home.Path, started.FileName);
+        Assert.Empty(started.Arguments);
+    }
+
+    [Fact]
+    public void The_fallback_icon_is_a_copy_so_disposing_it_leaves_the_systems_own_icon_alone()
+    {
+        var fallback = Program.FallbackIcon();
+
+        Assert.NotSame(SystemIcons.Application, fallback);
+        Assert.NotSame(fallback, Program.FallbackIcon());
+        fallback.Dispose();
+        Assert.True(SystemIcons.Application.Width > 0);
     }
 }

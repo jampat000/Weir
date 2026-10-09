@@ -86,6 +86,19 @@ sealed class StartupRegistration(string runKeyPath, string startupFolder, string
         }
     }
 
+    /// <summary>Switches it: off if it is on, on if it is off. This is the tray menu's "Start with Windows".</summary>
+    internal void Toggle()
+    {
+        if (IsEnabled)
+        {
+            Disable();
+        }
+        else
+        {
+            Enable();
+        }
+    }
+
     /// <summary>
     /// Points the entry at the running Weir after an update, when there is one. An update never turns it on: only the person does.
     /// </summary>

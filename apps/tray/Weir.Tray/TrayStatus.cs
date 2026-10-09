@@ -14,6 +14,17 @@ sealed record TrayStatus(
     internal bool NeedsYou => !ServerOk || FilesNeedingYou > 0 || ManagersUnreachable.Count > 0;
 }
 
+/// <summary>One look at tray-status.json: what it held and when the server wrote it.</summary>
+/// <param name="Status">What the file says, or null when there is no file or it holds nothing usable.</param>
+/// <param name="WrittenAtUtc">When the file was last written.</param>
+/// <param name="Failed">Whether the file could not be read this time.</param>
+readonly record struct TrayStatusReading(TrayStatus? Status, DateTime? WrittenAtUtc, bool Failed)
+{
+    internal static TrayStatusReading Missing { get; } = new(null, null, false);
+
+    internal static TrayStatusReading Unreadable { get; } = new(null, null, true);
+}
+
 /// <summary>
 /// tray-status.json in the runtime home, written by the server (atomically, whenever its content changes) for the tray
 /// to show: the paused state and what needs the person. A file, like work-state.json, because the tray has no signed-in
@@ -25,22 +36,29 @@ static class TrayStatusFile
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
-    /// <summary>The status the server wrote, or null when there is none to show: no file yet, or one that cannot be read.</summary>
-    internal static TrayStatus? Read(string runtimeHome, Action<string> log)
+    /// <summary>
+    /// What the file holds now: <see cref="TrayStatusReading.Missing"/> when there is none, or
+    /// <see cref="TrayStatusReading.Unreadable"/> when it cannot be read this time (the server is replacing it, or it is
+    /// damaged), which says nothing about the status and is never a reason to change what is shown. The file is opened so
+    /// that the server can still rename a new one over it while it is read.
+    /// </summary>
+    internal static TrayStatusReading Read(string runtimeHome, Action<string> log)
     {
         var path = Path.Combine(runtimeHome, FileName);
         try
         {
-            if (!File.Exists(path))
-            {
-                return null;
-            }
-            return Parse(JsonSerializer.Deserialize<Wire>(File.ReadAllText(path), Json));
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var wrote = File.GetLastWriteTimeUtc(path);
+            return new TrayStatusReading(Parse(JsonSerializer.Deserialize<Wire>(stream, Json)), wrote, Failed: false);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return TrayStatusReading.Missing;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
-            log($"{FileName} could not be read ({ex.Message}); showing no status from the server.");
-            return null;
+            log($"{FileName} could not be read ({ex.Message}).");
+            return TrayStatusReading.Unreadable;
         }
     }
 

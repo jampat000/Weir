@@ -19,8 +19,8 @@ static class Program
     internal const string UpdateCheckPath = "/system?tab=about";
 
     /// <summary>
-    /// Start without opening Weir in the browser. The starts nobody asked to see pass it: at sign-in, and after an
-    /// update (#638).
+    /// Start without telling the person Weir is running. The starts nobody asked to see pass it: at sign-in, and after an
+    /// update (#638). A start never opens the browser either way; only a click does.
     /// </summary>
     internal const string NoBrowserArgument = "--no-browser";
 
@@ -62,8 +62,11 @@ static class Program
             return 0;
         }
 
+        // Listening from here, not from when the icon exists: a second launch while this one asks for a port or installs
+        // an update is told about, not dropped.
+        using var secondLaunch = new SecondLaunchSignal();
         LogUnhandledErrors();
-        return RunTray(args);
+        return RunTray(args, secondLaunch);
     }
 
     // Velopack runs Weir.exe with its own arguments to install, update and uninstall; these hooks run then and
@@ -134,7 +137,7 @@ static class Program
         }
     }
 
-    private static int RunTray(string[] args)
+    private static int RunTray(string[] args, SecondLaunchSignal secondLaunch)
     {
         try
         {
@@ -172,9 +175,10 @@ static class Program
             using var app = new TrayApp(
                 port.Value,
                 listenScope,
-                new TrayStart(OpensBrowser(args), HasInteractiveDesktop(args, PortChoice.HasInteractiveDesktop)),
+                new TrayStart(AnnouncesStart(args), HasInteractiveDesktop(args, PortChoice.HasInteractiveDesktop)),
                 updateService,
-                updateSettings);
+                updateSettings,
+                secondLaunch);
             return app.Run();
         }
         catch (Exception ex)
@@ -298,8 +302,14 @@ static class Program
             }
         }
 
-        return SystemIcons.Application;
+        return FallbackIcon();
     }
+
+    /// <summary>
+    /// A copy of the system's application icon, for when the brand icon cannot be found. A copy, because whoever is given the icon
+    /// disposes it, and the system's own instance is shared by every other caller.
+    /// </summary>
+    internal static Icon FallbackIcon() => (Icon)SystemIcons.Application.Clone();
 
     // Velopack's install and uninstall hooks: stop this install's own tray and server so their
     // files can be replaced or removed. Only this install's — see InstallProcesses.
@@ -321,8 +331,11 @@ static class Program
         return Path.Combine(programData, "Weir");
     }
 
-    /// <summary>Whether a start with these arguments opens Weir in the browser once its server is healthy.</summary>
-    internal static bool OpensBrowser(IEnumerable<string> args) => !args.Contains(NoBrowserArgument) && !IsSilent(args);
+    /// <summary>
+    /// Whether a start with these arguments tells the person, with a balloon, that Weir is running once its server is
+    /// ready. No start opens the browser: only a click does.
+    /// </summary>
+    internal static bool AnnouncesStart(IEnumerable<string> args) => !args.Contains(NoBrowserArgument) && !IsSilent(args);
 
     /// <summary>Whether <see cref="SilentArgument"/> was passed: no UI of any kind, ever, for this start.</summary>
     internal static bool IsSilent(IEnumerable<string> args) => args.Contains(SilentArgument);

@@ -45,6 +45,7 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private volatile int _port;
     private volatile ListenScope _scope;
     private volatile ServerPhase _phase = ServerPhase.Starting;
+    private long _startedAtTicks;
     private Task? _watchdog;
     private Action? _onGaveUp;
     private CancellationToken _watchdogToken;
@@ -66,6 +67,9 @@ sealed class ServerHost : IServerListenScope, IDisposable
     internal ServerPhase Phase => _phase;
 
     public ListenScope Scope => _scope;
+
+    /// <summary>When the server process this host last started began, or null if it has started none.</summary>
+    internal DateTime? StartedAtUtc => Volatile.Read(ref _startedAtTicks) is > 0 and var ticks ? new DateTime(ticks, DateTimeKind.Utc) : null;
 
     private void SetPhase(ServerPhase phase)
     {
@@ -382,8 +386,22 @@ sealed class ServerHost : IServerListenScope, IDisposable
             CreateNoWindow = true,
         }) ?? throw new InvalidOperationException($"Failed to start {ServerExeName}");
 
+        Volatile.Write(ref _startedAtTicks, StartTimeUtc(process).Ticks);
         _process = process;
         TrayLog.Write($"Bundled server host pid={process.Id}");
+    }
+
+    // A server that has already exited cannot say when it started; it started no later than now.
+    private static DateTime StartTimeUtc(Process process)
+    {
+        try
+        {
+            return process.StartTime.ToUniversalTime();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+        {
+            return DateTime.UtcNow;
+        }
     }
 
     private Task WaitForHealthAsync(CancellationToken cancellationToken)
