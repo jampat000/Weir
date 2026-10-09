@@ -361,7 +361,17 @@ public sealed class LibraryFolderChainRulesTests
 
     private static IReadOnlyList<LocalFolder> Unreachable(
         FakeFolderProbe probe, bool workIsDefault = false, string watched = Watched, string work = Work, string output = Output) =>
-        LibraryFolderChainRules.UnreachableFolders(watched, work, workIsDefault, output, probe);
+        [.. LibraryFolderChainRules.FoldersToReach(watched, work, workIsDefault, output)
+            .Where(folder => LibraryFolderChainRules.IsUnreachable(folder, probe))
+            .Select(folder => folder.Folder)];
+
+    [Fact]
+    public void The_folders_to_reach_are_the_ones_that_are_set_trimmed_and_with_the_default_work_folder_marked()
+    {
+        var folders = LibraryFolderChainRules.FoldersToReach($" {Watched} ", Work, workFolderIsDefault: true, " ");
+
+        Assert.Equal([new FolderToReach(LocalFolder.Watched, Watched, false), new FolderToReach(LocalFolder.Work, Work, true)], folders);
+    }
 
     [Fact]
     public void Folders_that_exist_and_can_be_listed_are_all_reachable()

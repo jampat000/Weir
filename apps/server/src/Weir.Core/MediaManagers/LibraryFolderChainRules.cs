@@ -36,6 +36,12 @@ public enum LocalFolder
     Output,
 }
 
+/// <summary>A folder of a workflow whose reach is asked about.</summary>
+/// <param name="Folder">Which of the workflow's folders it is.</param>
+/// <param name="Path">Where it is.</param>
+/// <param name="IsDefault">The work folder is Weir's own default, made the first time it is needed.</param>
+public sealed record FolderToReach(LocalFolder Folder, string Path, bool IsDefault);
+
 /// <summary>
 /// Weir's own side of a library's folder chain: whether the watched, work and output folders exist and are
 /// usable, and whether a finished file can be moved from the work folder into the output folder or has to be copied
@@ -73,35 +79,44 @@ public static class LibraryFolderChainRules
     }
 
     /// <summary>
-    /// The folders Weir cannot reach: one that does not exist, or that it cannot list. They are judged as
-    /// <see cref="CheckLocalFolders"/> judges them, but only for reachability. A blank folder is a workflow still being set up,
-    /// a default work folder that is not made yet is Weir's to make, and where a finished file can move is not a matter of reach.
+    /// The folders whose reach is worth asking about, one by one, so a share that hangs holds up only its own answer. A blank
+    /// folder is a workflow still being set up, and is left out.
     /// </summary>
-    public static IReadOnlyList<LocalFolder> UnreachableFolders(
-        string watchedFolder, string workFolder, bool workFolderIsDefault, string outputFolder, IFolderProbe probe)
+    public static IReadOnlyList<FolderToReach> FoldersToReach(
+        string watchedFolder, string workFolder, bool workFolderIsDefault, string outputFolder)
     {
+        var folders = new List<FolderToReach>();
+        AddIfSet(folders, LocalFolder.Watched, watchedFolder, isDefault: false);
+        AddIfSet(folders, LocalFolder.Work, workFolder, workFolderIsDefault);
+        AddIfSet(folders, LocalFolder.Output, outputFolder, isDefault: false);
+        return folders;
+    }
+
+    /// <summary>
+    /// Whether Weir cannot reach the folder: it does not exist, or Weir cannot list it. It is judged as
+    /// <see cref="CheckLocalFolders"/> judges it, but only for reachability: a default work folder that is not made yet is
+    /// Weir's to make, and where a finished file can move is not a matter of reach.
+    /// </summary>
+    public static bool IsUnreachable(FolderToReach folder, IFolderProbe probe)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
         ArgumentNullException.ThrowIfNull(probe);
-        var watched = (watchedFolder ?? string.Empty).Trim();
-        var work = (workFolder ?? string.Empty).Trim();
-        var output = (outputFolder ?? string.Empty).Trim();
-
-        var unreachable = new List<LocalFolder>();
-        if (watched.Length > 0 && FolderReadLine("watched", watched, probe).State == SetupCheckLine.Problem)
+        var line = folder.Folder switch
         {
-            unreachable.Add(LocalFolder.Watched);
-        }
+            LocalFolder.Watched => FolderReadLine("watched", folder.Path, probe),
+            LocalFolder.Work => WorkFolderLine(folder.Path, folder.IsDefault, probe),
+            _ => FolderReadLine("output", folder.Path, probe),
+        };
+        return line.State == SetupCheckLine.Problem;
+    }
 
-        if (work.Length > 0 && WorkFolderLine(work, workFolderIsDefault, probe).State == SetupCheckLine.Problem)
+    private static void AddIfSet(List<FolderToReach> folders, LocalFolder folder, string? path, bool isDefault)
+    {
+        var trimmed = (path ?? string.Empty).Trim();
+        if (trimmed.Length > 0)
         {
-            unreachable.Add(LocalFolder.Work);
+            folders.Add(new FolderToReach(folder, trimmed, isDefault));
         }
-
-        if (output.Length > 0 && FolderReadLine("output", output, probe).State == SetupCheckLine.Problem)
-        {
-            unreachable.Add(LocalFolder.Output);
-        }
-
-        return unreachable;
     }
 
     /// <summary>

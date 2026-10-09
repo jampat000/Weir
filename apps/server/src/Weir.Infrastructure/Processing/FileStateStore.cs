@@ -31,6 +31,14 @@ public sealed record ScannedFileWrite(
 /// watched-folder scan performs.</summary>
 public sealed partial class FileStateStore
 {
+    private readonly DataChangePublisher? _changes;
+
+    /// <param name="changes">Told, once a delete or a cancel commits, so every open screen drops the file at once; none says nothing.</param>
+    public FileStateStore(DataChangePublisher? changes = null)
+    {
+        _changes = changes;
+    }
+
     private const string Columns =
         "id, library_id, relative_path, status, status_reason, blocked_by_connection, size_bytes, video_width, video_height, " +
         "video_codec, audio_track_count, subtitle_track_count, duration_seconds, audio_codecs, video_bit_depth, size_changed_at, " +
@@ -81,8 +89,13 @@ public sealed partial class FileStateStore
     }
 
     /// <summary>Removes Weir's record; never touches the file on disk.</summary>
-    public Task ForgetAsync(UnitOfWork uow, long id) =>
-        uow.ExecuteAsync("DELETE FROM files WHERE id = @id", ("@id", id));
+    public async Task ForgetAsync(UnitOfWork uow, long id)
+    {
+        if (await uow.ExecuteAsync("DELETE FROM files WHERE id = @id", ("@id", id)).ConfigureAwait(false) > 0)
+        {
+            AnnounceOnCommit(uow);
+        }
+    }
 
     /// <summary>
     /// A queued pass for this file was cancelled before Weir started on it (#643): the file reads cancelled, with
@@ -92,7 +105,7 @@ public sealed partial class FileStateStore
     public async Task MarkCancelledAsync(UnitOfWork uow, long libraryId, string relativePath, string reason)
     {
         ArgumentNullException.ThrowIfNull(uow);
-        await uow.ExecuteAsync(
+        var changed = await uow.ExecuteAsync(
             "UPDATE files SET status = @cancelled, status_reason = @reason, next_retry_at = NULL, hold_until = NULL, " +
             "blocked_by_connection = NULL, updated_at = CURRENT_TIMESTAMP " +
             "WHERE library_id = @library AND relative_path = @path AND status IN (@unprocessed, @held, @outside, @blocked, @failed)",
@@ -105,7 +118,17 @@ public sealed partial class FileStateStore
             ("@outside", ProcessingFileStatuses.OutOfSchedule),
             ("@blocked", ProcessingFileStatuses.BlockedUpstream),
             ("@failed", ProcessingFileStatuses.ProcessingFailed)).ConfigureAwait(false);
+        if (changed > 0)
+        {
+            AnnounceOnCommit(uow);
+        }
     }
+
+    /// <summary>
+    /// Says, once <paramref name="uow"/> commits, that a file left the lists without a job moving, so Activity and the Dashboard
+    /// drop it at once, on the topic that refreshes the file lists.
+    /// </summary>
+    private void AnnounceOnCommit(UnitOfWork uow) => _changes?.PublishOnCommit(uow, DataTopics.LibraryScan);
 
     /// <summary>Every row of the library, for a scan that decides about all of its files from one read.</summary>
     public Task<List<ProcessingFileRecord>> ListForLibraryAsync(UnitOfWork uow, long libraryId) =>

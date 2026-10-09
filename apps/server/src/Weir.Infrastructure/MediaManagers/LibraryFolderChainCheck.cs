@@ -83,14 +83,14 @@ public sealed class LibraryFolderChainCheck
     }
 
     /// <summary>
-    /// Which of the library's own folders Weir cannot reach right now, by the same judgement as the chain's local lines but
+    /// The library's own folders whose reach can be asked about, each on its own (<see cref="LibraryFolderChainRules.IsUnreachable"/>),
     /// without the media managers and download clients, so it stays cheap enough to ask often.
     /// </summary>
-    public static IReadOnlyList<LocalFolder> UnreachableFolders(ProcessingLibraryRecord library, string weirHome, IFolderProbe probe)
+    public static IReadOnlyList<FolderToReach> FoldersToReach(ProcessingLibraryRecord library, string weirHome)
     {
         ArgumentNullException.ThrowIfNull(library);
         var (workFolder, workFolderIsDefault) = WorkFolderOf(library, weirHome);
-        return LibraryFolderChainRules.UnreachableFolders(library.WatchedFolder, workFolder, workFolderIsDefault, library.OutputFolder, probe);
+        return LibraryFolderChainRules.FoldersToReach(library.WatchedFolder, workFolder, workFolderIsDefault, library.OutputFolder);
     }
 
     /// <summary>The library's work folder, and whether that is Weir's own default because it set none.</summary>

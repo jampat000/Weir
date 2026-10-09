@@ -200,7 +200,7 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task A_workflow_added_with_a_folder_that_is_not_there_shows_at_once_without_waiting_for_the_next_look()
+    public async Task A_workflow_added_with_a_folder_that_is_not_there_is_looked_at_when_it_is_added_and_confirmed_soon_after()
     {
         await StartAsync();
         await UntilAsync(_ => true);
@@ -210,7 +210,11 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
             $"VALUES ('Series', 'tv', '{_shares.Join("gone", "watched")}', '{_shares.Path}')");
         _changes.Publish(DataTopics.Libraries);
 
-        await UntilAsync(status => Names(status, "folders").Length == 1);
+        await Eventually.ThatAsync(() =>
+        {
+            _store.Clock.Advance(FolderReachability.ConfirmAfter);
+            return Status() is { } status && Names(status, "folders").Length == 1;
+        });
         Assert.Equal(["The watched folder for Series"], Names(Status()!.Value, "folders"));
     }
 
