@@ -468,8 +468,11 @@ public sealed class SuiteApiTests
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
 
-        using var applyUpdate = await operatorClient.PostAsync("/api/v1/suite/apply-update", new { csrf_token = await operatorClient.CsrfAsync() });
-        Assert.Equal(HttpStatusCode.Forbidden, applyUpdate.StatusCode);
+        foreach (var path in new[] { "/api/v1/suite/check-update", "/api/v1/suite/download-update", "/api/v1/suite/apply-update" })
+        {
+            using var updateStep = await operatorClient.PostAsync(path, new { csrf_token = await operatorClient.CsrfAsync() });
+            Assert.Equal(HttpStatusCode.Forbidden, updateStep.StatusCode);
+        }
 
         using var updateSettings = await operatorClient.PutAsync(
             "/api/v1/suite/update-settings",

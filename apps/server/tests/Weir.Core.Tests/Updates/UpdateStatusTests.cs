@@ -55,4 +55,36 @@ public sealed class UpdateStatusTests
 
         Assert.Throws<WireValueException>(() => ReleaseCatalog.CoerceReleaseListPayload(payload));
     }
+
+    private static string StateOf(string? file) =>
+        WireJsonWriter.Dumps(UpdateStatus.ParseUpdateState(file), WireJsonFormat.Response);
+
+    [Fact]
+    public void The_tray_state_names_where_the_tray_is_and_why_it_failed()
+    {
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"checking\",\"failure\":null}", StateOf("""{"state":"checking","downloaded":false}"""));
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":\"2.0.0\",\"state\":\"downloading\",\"failure\":null}", StateOf("""{"state":"downloading","version":"2.0.0"}"""));
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"failed\",\"failure\":\"No route.\"}", StateOf("""{"state":"failed","failure":"No route."}"""));
+    }
+
+    [Fact]
+    public void A_failure_is_only_read_from_a_failed_state()
+    {
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"idle\",\"failure\":null}", StateOf("""{"state":"idle","failure":"stale"}"""));
+    }
+
+    [Fact]
+    public void Downloaded_settles_whether_an_update_waits_whatever_the_named_state_says()
+    {
+        Assert.Equal("{\"downloaded\":true,\"pending_version\":\"2.0.0\",\"state\":\"downloaded\",\"failure\":null}", StateOf("""{"state":"checking","downloaded":true,"version":"2.0.0"}"""));
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":\"2.0.0\",\"state\":\"idle\",\"failure\":null}", StateOf("""{"state":"downloaded","downloaded":false,"version":"2.0.0"}"""));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("[1, 2]")]
+    [InlineData("{\"state\": \"exploding\"}")]
+    public void A_state_that_is_missing_or_not_one_of_the_tray_s_reads_as_idle(string? file) =>
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"idle\",\"failure\":null}", StateOf(file));
 }

@@ -225,9 +225,9 @@ public sealed class AuthAndSettingsStoreTests
         Assert.Equal("NotifyOnly", ((WireString)files.ReadSettings(warned.Add)["mode"]).Value);
         Assert.Single(warned);
 
-        Assert.Equal("{\"downloaded\":false,\"pending_version\":null}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
+        Assert.Equal("{\"downloaded\":false,\"pending_version\":null,\"state\":\"idle\",\"failure\":null,\"tray_running\":false}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
         File.WriteAllText(Path.Join(fixture.Home.Path, "update-state.json"), "{\"downloaded\": true, \"version\": \"2.0.0\"}");
-        Assert.Equal("{\"downloaded\":true,\"pending_version\":\"2.0.0\"}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
+        Assert.Equal("{\"downloaded\":true,\"pending_version\":\"2.0.0\",\"state\":\"downloaded\",\"failure\":null,\"tray_running\":false}", WireJsonWriter.Dumps(files.ReadState(), WireJsonFormat.Response));
         files.WriteApplyFlag();
         Assert.True(File.Exists(Path.Join(fixture.Home.Path, "update-apply-now")));
     }

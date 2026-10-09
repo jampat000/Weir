@@ -6,16 +6,16 @@ import { UpdateSection } from "./update-section";
 
 const mocks = vi.hoisted(() => ({
   useUpdateStatusQuery: vi.fn(),
-  useUpdateSettingsQuery: vi.fn(),
 }));
 
 vi.mock("../../../../lib/settings/queries", () => ({
   useUpdateStatusQuery: () => mocks.useUpdateStatusQuery(),
-  useUpdateSettingsQuery: () => mocks.useUpdateSettingsQuery(),
   useAppSettingsQuery: () => ({ data: { app_timezone: "UTC" } }),
 }));
 
-vi.mock("./update-ready-notice", () => ({ UpdateReadyNotice: () => null }));
+vi.mock("./update-actions", () => ({
+  UpdateActions: () => <div data-testid="update-actions" />,
+}));
 vi.mock("./update-preferences", () => ({ UpdatePreferences: () => null }));
 
 const LIMITED =
@@ -31,6 +31,7 @@ function status(
       | "known_update_available"
       | "docker_update_command"
       | "windows_installer_url"
+      | "release_url"
     >,
   installType = "source",
 ): UpdateStatus {
@@ -56,7 +57,6 @@ function showStatus(update: UpdateStatus) {
 describe("UpdateSection while GitHub limits update checks", () => {
   beforeEach(() => {
     mocks.useUpdateStatusQuery.mockReset();
-    mocks.useUpdateSettingsQuery.mockReturnValue({ data: undefined });
   });
 
   it("says plainly when Weir will check again", () => {
@@ -107,10 +107,7 @@ describe("UpdateSection while GitHub limits update checks", () => {
     ).toBeInTheDocument();
   });
 
-  it("still offers the update Weir already knew of: the download link in notify-only mode", () => {
-    mocks.useUpdateSettingsQuery.mockReturnValue({
-      data: { mode: "NotifyOnly" },
-    });
+  it("keeps the installer as a small link on Windows, where the update buttons take the update", () => {
     showStatus(
       status(
         {
@@ -124,8 +121,19 @@ describe("UpdateSection while GitHub limits update checks", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "Download the update" }),
+      screen.getByRole("link", { name: "Download installer →" }),
     ).toHaveAttribute("href", "https://example.test/Weir-win-Setup.exe");
+    expect(screen.getByTestId("update-actions")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Download the update" }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check again →" })).toBeNull();
+  });
+
+  it("offers the update buttons on Windows only", () => {
+    showStatus(status({ summary: LIMITED }, "docker"));
+
+    expect(screen.queryByTestId("update-actions")).toBeNull();
   });
 
   it("offers no update when the last release it knew of is not newer", () => {
@@ -148,5 +156,51 @@ describe("UpdateSection while GitHub limits update checks", () => {
     showStatus(status({ summary: LIMITED }));
 
     expect(screen.getByRole("button", { name: "Check again →" })).toBeEnabled();
+  });
+
+  describe("when an update is available on Windows", () => {
+    function showAvailable() {
+      showStatus({
+        ...status(
+          {
+            summary: "Weir 9.9.9 is available.",
+            latest_version: "9.9.9",
+            windows_installer_url: "https://example.test/Weir-win-Setup.exe",
+            release_url: "https://example.test/release",
+          },
+          "windows",
+        ),
+        status: "update_available",
+      });
+    }
+
+    it("says it is available, not ready, and says which version in a sentence", () => {
+      showAvailable();
+
+      const line = screen.getByTestId("suite-settings-release-status");
+      expect(line).toHaveTextContent("Update available");
+      expect(line).not.toHaveTextContent("Update ready");
+      expect(line).toHaveTextContent(
+        "Weir v9.9.9 is available (you have v3.2.16)",
+      );
+    });
+
+    it("keeps the installer and the release notes as quiet links under the buttons, not controls in the header", () => {
+      showAvailable();
+
+      for (const name of ["Download installer →", "Release notes →"]) {
+        const link = screen.getByRole("link", { name });
+        expect(link).toHaveClass("mm-quiet-link");
+        expect(link.closest(".mm-panel__aside")).toBeNull();
+      }
+    });
+  });
+
+  it("says which version is running when Weir is up to date", () => {
+    showStatus({ ...status({ summary: "" }, "windows"), status: "up_to_date" });
+
+    expect(
+      screen.getByTestId("suite-settings-release-status"),
+    ).toHaveTextContent("You have Weir v3.2.16");
   });
 });

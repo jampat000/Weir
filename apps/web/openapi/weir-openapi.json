@@ -270,6 +270,38 @@
         "title": "ApplyUpdateIn",
         "type": "object"
       },
+      "CheckUpdateIn": {
+        "additionalProperties": false,
+        "description": "Body for POST /suite/check-update.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CheckUpdateIn",
+        "type": "object"
+      },
+      "DownloadUpdateIn": {
+        "additionalProperties": false,
+        "description": "Body for POST /suite/download-update.",
+        "properties": {
+          "csrf_token": {
+            "minLength": 1,
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "DownloadUpdateIn",
+        "type": "object"
+      },
       "BootstrapIn": {
         "additionalProperties": false,
         "properties": {
@@ -12121,12 +12153,23 @@
       },
       "UpdateStateOut": {
         "additionalProperties": false,
-        "description": "Current state of any downloaded-but-not-yet-applied update (read from update-state.json).",
+        "description": "Where the tray is with an update: idle (an update it found and did not download is named in pending_version), checking, downloading, downloaded (waiting to be applied) or failed (failure says why). Read from update-state.json. tray_running says whether a tray is there to take a request: false on a Docker or source install and when the tray has not said it is alive lately.",
         "properties": {
           "downloaded": {
             "default": false,
             "title": "Downloaded",
             "type": "boolean"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
           },
           "pending_version": {
             "anyOf": [
@@ -12138,6 +12181,23 @@
               }
             ],
             "title": "Pending Version"
+          },
+          "state": {
+            "default": "idle",
+            "enum": [
+              "idle",
+              "checking",
+              "downloading",
+              "downloaded",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "tray_running": {
+            "default": false,
+            "title": "Tray Running",
+            "type": "boolean"
           }
         },
         "title": "UpdateStateOut",
@@ -18250,6 +18310,90 @@
           }
         },
         "summary": "Post Suite Apply Update",
+        "tags": [
+          "suite"
+        ]
+      }
+    },
+    "/api/v1/suite/check-update": {
+      "post": {
+        "description": "Ask the tray to check for an update now.",
+        "operationId": "post_suite_check_update_api_v1_suite_check_update_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Suite Check Update",
+        "tags": [
+          "suite"
+        ]
+      }
+    },
+    "/api/v1/suite/download-update": {
+      "post": {
+        "description": "Ask the tray to download the available update now, whatever the update mode.",
+        "operationId": "post_suite_download_update_api_v1_suite_download_update_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Suite Download Update",
         "tags": [
           "suite"
         ]

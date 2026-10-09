@@ -3,17 +3,13 @@ import { useState } from "react";
 import { Chip } from "../../../../components/panels/chip";
 import { Panel } from "../../../../components/panels/panel";
 import { errorMessage } from "../../../../lib/api/error-message";
-import {
-  useUpdateSettingsQuery,
-  useUpdateStatusQuery,
-} from "../../../../lib/settings/queries";
+import { useUpdateStatusQuery } from "../../../../lib/settings/queries";
 import type { UpdateStatus } from "../../../../lib/settings/types";
 import { updateMeaning } from "../../../../lib/settings/update-status";
-import { mmActionButtonClass } from "../../../../lib/ui/mm-control-roles";
 import { useAppDateFormatter } from "../../../../lib/ui/mm-format-date";
-import { updateStatusLabel } from "./update-words";
+import { UpdateActions } from "./update-actions";
 import { UpdatePreferences } from "./update-preferences";
-import { UpdateReadyNotice } from "./update-ready-notice";
+import { updateStatusLabel } from "./update-words";
 
 const COPIED_MS = 2000;
 
@@ -40,12 +36,13 @@ function CopyCommandButton({ command }: { command: string }) {
   );
 }
 
-/** The version the status is about: the new one when there is one, otherwise the one running. */
-function statusVersion(status: UpdateStatus): string | null {
-  if (status.status === "update_available")
-    return status.latest_version ?? null;
-  if (status.status === "up_to_date") return status.current_version;
-  return null;
+/** The line beside the status pill, as a sentence: the new version and the one running, or the one running, else the server's own summary. */
+function statusText(status: UpdateStatus): string {
+  if (status.status === "update_available" && status.latest_version)
+    return `Weir v${status.latest_version} is available (you have v${status.current_version})`;
+  if (status.status === "up_to_date")
+    return `You have Weir v${status.current_version}`;
+  return status.summary;
 }
 
 /** While GitHub is limiting the checks, the newest release Weir had learned of before that. */
@@ -70,7 +67,6 @@ function ReleaseStatus({
   checking,
   isWindows,
   dockerCommand,
-  showUpdateButton,
   onCheck,
 }: {
   status: UpdateStatus;
@@ -78,15 +74,24 @@ function ReleaseStatus({
   isWindows: boolean;
   /** The command a Docker install runs to take the update, when there is an update and it is one. */
   dockerCommand: string | null;
-  /** Notify-only mode never downloads anything itself, so the installer link needs to read as the action, not a footnote. */
-  showUpdateButton: boolean;
   onCheck: () => void;
 }) {
   const links = [
     { label: "Download installer →", href: status.windows_installer_url },
     { label: "Release notes →", href: status.release_url },
-  ].filter((link) => link.href);
-  const version = statusVersion(status);
+  ]
+    .filter((link) => link.href)
+    .map((link) => (
+      <a
+        key={link.label}
+        className="mm-quiet-link"
+        href={link.href ?? undefined}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {link.label}
+      </a>
+    ));
 
   return (
     <Panel
@@ -96,30 +101,21 @@ function ReleaseStatus({
       padded
       dataTestId="suite-settings-upgrade-tab"
       aside={
-        <>
-          <button
-            type="button"
-            className="mm-quiet-link"
-            disabled={checking}
-            onClick={onCheck}
-          >
-            {checking ? "Checking..." : "Check again →"}
-          </button>
-          {links.map((link) => (
-            <a
-              key={link.label}
+        isWindows ? undefined : (
+          <>
+            <button
+              type="button"
               className="mm-quiet-link"
-              href={link.href ?? undefined}
-              target="_blank"
-              rel="noreferrer"
+              disabled={checking}
+              onClick={onCheck}
             >
-              {link.label}
-            </a>
-          ))}
-        </>
+              {checking ? "Checking..." : "Check again →"}
+            </button>
+            {links}
+          </>
+        )
       }
     >
-      {isWindows ? <UpdateReadyNotice /> : null}
       <p
         className="mm-status-line"
         title={status.summary}
@@ -128,18 +124,14 @@ function ReleaseStatus({
         <Chip meaning={updateMeaning(status.status)}>
           {updateStatusLabel(status.status)}
         </Chip>
-        <span>{version ?? status.summary}</span>
+        <span>{statusText(status)}</span>
       </p>
       <LastKnownRelease status={status} />
-      {showUpdateButton && status.windows_installer_url ? (
-        <a
-          href={status.windows_installer_url}
-          target="_blank"
-          rel="noreferrer"
-          className={`${mmActionButtonClass({ variant: "primary" })} mm-sys-btn mt-3 inline-flex`}
-        >
-          Download the update
-        </a>
+      {isWindows ? (
+        <>
+          <UpdateActions status={status} />
+          <p className="mm-update-links">{links}</p>
+        </>
       ) : null}
       {isWindows ? <UpdatePreferences /> : null}
       {dockerCommand ? <DockerUpgradeSteps command={dockerCommand} /> : null}
@@ -177,8 +169,6 @@ export function UpdateSection() {
   const updateStatusQ = useUpdateStatusQuery();
   const status = updateStatusQ.data;
   const isWindows = status?.install_type === "windows";
-  const updateSettingsQ = useUpdateSettingsQuery(isWindows);
-  const notifyOnly = isWindows && updateSettingsQ.data?.mode === "NotifyOnly";
   const updateAvailable =
     status?.status === "update_available" ||
     status?.known_update_available === true;
@@ -212,7 +202,6 @@ export function UpdateSection() {
           ? (status.docker_update_command ?? null)
           : null
       }
-      showUpdateButton={Boolean(notifyOnly && updateAvailable)}
       onCheck={() => void updateStatusQ.refetch()}
     />
   );
