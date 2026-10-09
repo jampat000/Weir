@@ -65,6 +65,19 @@ public sealed class ServerProcessStopTests : IDisposable
     }
 
     [Fact]
+    public void Quit_waits_longer_than_the_servers_host_allows_its_workers_and_the_installers_hooks_less_than_Velopack_does()
+    {
+        // The server's host gives its workers 30 seconds to finish when asked to stop; Velopack ends an install or uninstall hook
+        // after 30 seconds, and a person is waiting for the tray at start-up.
+        var host = TimeSpan.FromSeconds(30);
+        var velopackHook = TimeSpan.FromSeconds(30);
+
+        Assert.True(ServerStopTimeouts.Default.Graceful > host);
+        Assert.True(ServerStopTimeouts.Hook.WorstCase <= velopackHook - TimeSpan.FromSeconds(10), ServerStopTimeouts.Hook.WorstCase.ToString());
+        Assert.True(ServerStopTimeouts.Orphan.WorstCase <= TimeSpan.FromSeconds(15), ServerStopTimeouts.Orphan.WorstCase.ToString());
+    }
+
+    [Fact]
     public async Task A_server_that_has_already_exited_needs_no_stopping()
     {
         var server = await _servers.StartAsync(ServerFolder());

@@ -83,6 +83,54 @@ public sealed class ServerHealthTests
     }
 
     [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_that_refuses_every_connection_times_out_at_the_short_limit_not_the_long_one()
+    {
+        var clock = new DelayWatchingTimeProvider();
+        var handler = new ScriptedHandler(_ => throw new HttpRequestException("No connection could be made"));
+        using var client = new HttpClient(handler);
+
+        var waiting = WaitWithLongerStart(client, clock, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
+        await DriveUntilDone(waiting, clock);
+
+        await Assert.ThrowsAsync<TimeoutException>(() => waiting);
+        Assert.Equal(5, handler.Calls);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_that_answers_not_ready_is_waited_for_up_to_the_long_limit()
+    {
+        var clock = new DelayWatchingTimeProvider();
+        var handler = new ScriptedHandler(_ => HttpStatusCode.ServiceUnavailable);
+        using var client = new HttpClient(handler);
+
+        var waiting = WaitWithLongerStart(client, clock, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
+        await DriveUntilDone(waiting, clock);
+
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => waiting);
+        Assert.Contains("HTTP 503", error.Message);
+        Assert.Equal(41, handler.Calls);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_that_listens_late_and_then_answers_not_ready_gets_the_long_limit_from_then()
+    {
+        var clock = new DelayWatchingTimeProvider();
+        var handler = new ScriptedHandler(call => call switch
+        {
+            < 3 => throw new HttpRequestException("No connection could be made"),
+            < 30 => HttpStatusCode.ServiceUnavailable,
+            _ => HttpStatusCode.OK,
+        });
+        using var client = new HttpClient(handler);
+
+        var waiting = WaitWithLongerStart(client, clock, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
+        await DriveUntilDone(waiting, clock);
+
+        await waiting;
+        Assert.Equal(30, handler.Calls);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
     public async Task A_server_that_exited_fails_at_once_with_its_exit_code()
     {
         var handler = new ScriptedHandler(_ => HttpStatusCode.ServiceUnavailable);
@@ -98,6 +146,9 @@ public sealed class ServerHealthTests
 
     private static Task Wait(HttpClient client, TimeProvider clock, TimeSpan timeout) =>
         ServerHealth.WaitUntilReadyAsync(client, ReadyUrl, () => null, new ServerHealth.Timing(timeout, Pause, clock), CancellationToken.None);
+
+    private static Task WaitWithLongerStart(HttpClient client, TimeProvider clock, TimeSpan nothingAnswers, TimeSpan starting) =>
+        ServerHealth.WaitUntilReadyAsync(client, ReadyUrl, () => null, new ServerHealth.Timing(nothingAnswers, Pause, clock, starting), CancellationToken.None);
 
     // Lets each pause pass as soon as the wait starts it, until the wait ends.
     private static async Task DriveUntilDone(Task waiting, DelayWatchingTimeProvider clock)

@@ -313,7 +313,7 @@ static class Program
     }
 
     private static void StopOrphanedServers() =>
-        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: true, TrayLog.Write, "Startup (orphaned server check)");
+        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: true, TrayLog.Write, "Startup (orphaned server check)", ServerStopTimeouts.Orphan);
 
     /// <summary>The brand icon at its default size, for a window's title bar.</summary>
     internal static Icon LoadAppIcon() => LoadAppIcon(null);
@@ -356,7 +356,7 @@ static class Program
     // Velopack's install and uninstall hooks: stop this install's own tray and server so their
     // files can be replaced or removed. Only this install's — see InstallProcesses.
     private static void KillRunningProcesses(string why) =>
-        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: false, TrayLog.Write, why);
+        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: false, TrayLog.Write, why, ServerStopTimeouts.Hook);
 
     // The Weir.exe these hooks run from: the install's own tray, which is what a mark must name to count for the install.
     private static string InstalledTray() => Environment.ProcessPath ?? Path.Combine(InstallProcesses.Root(), "Weir.exe");

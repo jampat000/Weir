@@ -30,6 +30,9 @@ sealed class WeirOpener(
             case ServerPhase.Starting:
                 balloon("Weir", TrayBalloons.StillStartingText, ToolTipIcon.Info, null);
                 break;
+            case ServerPhase.Stopping:
+                balloon("Weir", TrayBalloons.StoppingText, ToolTipIcon.Info, null);
+                break;
             default:
                 balloon("Weir", TrayBalloons.NotRunningText, ToolTipIcon.Warning, restart);
                 break;
