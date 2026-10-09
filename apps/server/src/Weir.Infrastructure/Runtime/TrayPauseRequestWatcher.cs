@@ -1,6 +1,6 @@
+using System.Globalization;
 using System.Text;
 using System.Threading.Channels;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Configuration;
@@ -14,9 +14,12 @@ namespace Weir.Infrastructure.Runtime;
 /// <summary>
 /// Hears the tray ask to pause or resume processing. The tray writes <see cref="FileName"/> in Weir's data folder, holding
 /// <c>{ "paused": true, "requested_at": "2026-10-09T08:30:00Z" }</c> (<c>false</c> to resume); the request is applied through
-/// <see cref="SuitePauseService"/> as "The tray", which records it in Activity, and the file is deleted. A pause asked for from
-/// the tray lasts until it is resumed and leaves the choice to keep looking for new files as it stands. A file that is not that
-/// shape is ignored and deleted. Only a process that can write to the data folder can make a request; no route takes one.
+/// <see cref="SuitePauseService"/> as "The tray", which records it in Activity, and the file is deleted once that has
+/// succeeded; until then it is tried again. A pause asked for from the tray lasts until it is resumed and leaves the choice to
+/// keep looking for new files as it stands. A request is answered once: one that was already applied, one asked for more than
+/// <see cref="MaxAge"/> ago (a file left behind while the server was down) and a file that is not that shape are ignored and
+/// deleted, and a file the tray has rewritten since it was read is left for the next look. Only a process that can write to the
+/// data folder can make a request; no route takes one.
 /// </summary>
 public sealed class TrayPauseRequestWatcher : BackgroundService
 {
@@ -25,6 +28,15 @@ public sealed class TrayPauseRequestWatcher : BackgroundService
     /// <summary>Who Activity says paused or resumed processing.</summary>
     public const string RequestedBy = "The tray";
 
+    /// <summary>How old a request may be and still be answered, so a pause asked for long ago is never applied now.</summary>
+    public static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(2);
+
+    /// <summary>How long a file that cannot be read yet is given to be finished before it is read once more.</summary>
+    public static readonly TimeSpan HalfWrittenWait = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>How long to wait before a request that could not be applied is tried again.</summary>
+    public static readonly TimeSpan RetryAfter = TimeSpan.FromSeconds(2);
+
     private readonly WeirOptions _options;
     private readonly SqliteDatabase _database;
     private readonly SuitePauseService _pause;
@@ -32,6 +44,7 @@ public sealed class TrayPauseRequestWatcher : BackgroundService
     private readonly ILogger<TrayPauseRequestWatcher> _logger;
     private readonly Channel<bool> _written = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
     private FileSystemWatcher? _watcher;
+    private DateTimeOffset _lastApplied = DateTimeOffset.MinValue;
 
     public TrayPauseRequestWatcher(WeirOptions options, SqliteDatabase database, SuitePauseService pause, TimeProvider time, ILogger<TrayPauseRequestWatcher> logger)
     {
@@ -64,12 +77,16 @@ public sealed class TrayPauseRequestWatcher : BackgroundService
 
         try
         {
-            // A request left by a tray that asked while the server was down is answered first.
-            await ApplyAsync(stoppingToken).ConfigureAwait(false);
+            // A request left by a tray that asked while the server was down is looked at first.
+            _written.Writer.TryWrite(true);
             await foreach (var _ in _written.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
             {
                 await Task.Delay(TrayHandOffWatcher.Settle, stoppingToken).ConfigureAwait(false);
-                await ApplyAsync(stoppingToken).ConfigureAwait(false);
+                if (!await ApplyAsync(stoppingToken).ConfigureAwait(false))
+                {
+                    await Task.Delay(RetryAfter, stoppingToken).ConfigureAwait(false);
+                    _written.Writer.TryWrite(true);
+                }
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -102,51 +119,93 @@ public sealed class TrayPauseRequestWatcher : BackgroundService
         }
     }
 
-    private async Task ApplyAsync(CancellationToken stoppingToken)
+    /// <summary>Answers the request in the file, if there is one. False when it is to be looked at again.</summary>
+    private async Task<bool> ApplyAsync(CancellationToken stoppingToken)
     {
-        var path = Path.Join(_options.WeirHome, FileName);
-        string text;
         try
         {
-            if (!File.Exists(path))
+            await AnswerAsync(stoppingToken).ConfigureAwait(false);
+            return true;
+        }
+#pragma warning disable CA1031 // Nothing a request does may stop the server; it is logged and tried again.
+        catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            _logger.LogWarning(exception, "Weir could not answer the pause request from the tray; it will try again shortly.");
+            return false;
+        }
+    }
+
+    private async Task AnswerAsync(CancellationToken stoppingToken)
+    {
+        var path = Path.Join(_options.WeirHome, FileName);
+        if (await ReadAsync(path, stoppingToken).ConfigureAwait(false) is not { } text)
+        {
+            return;
+        }
+
+        var request = Parse(text);
+        if (request is null)
+        {
+            // The tray may still be writing it.
+            _logger.LogDebug("The tray's pause request cannot be read yet; looking again shortly.");
+            await Task.Delay(HalfWrittenWait, stoppingToken).ConfigureAwait(false);
+            if (await ReadAsync(path, stoppingToken).ConfigureAwait(false) is not { } again)
             {
                 return;
             }
 
-            text = await File.ReadAllTextAsync(path, Encoding.UTF8, stoppingToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            // Still being written; the write that finishes it is heard as well.
-            _logger.LogDebug(exception, "The tray's pause request could not be read yet.");
-            return;
+            text = again;
+            request = Parse(text);
         }
 
-        if (Read(text) is { } paused)
-        {
-            try
-            {
-                await ChangeAsync(paused, stoppingToken).ConfigureAwait(false);
-            }
-            catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
-            {
-                _logger.LogWarning(exception, "Weir could not {Change} processing as the tray asked.", paused ? "pause" : "resume");
-            }
-        }
-        else
+        if (request is null)
         {
             _logger.LogInformation("Weir ignored a pause request from the tray that it could not read.");
         }
+        else if (request.RequestedAt <= _lastApplied)
+        {
+            _logger.LogDebug("Weir already answered the tray's pause request made at {RequestedAt}.", request.RequestedAt);
+        }
+        else if (_time.GetUtcNow() - request.RequestedAt > MaxAge)
+        {
+            _logger.LogInformation("Weir ignored a pause request from the tray that was made more than {Minutes} minutes ago.", MaxAge.TotalMinutes);
+        }
+        else
+        {
+            await ChangeAsync(request.Paused, stoppingToken).ConfigureAwait(false);
+            _lastApplied = request.RequestedAt;
+        }
 
-        Delete(path);
+        await DeleteIfUnchangedAsync(path, text, stoppingToken).ConfigureAwait(false);
     }
 
-    /// <summary>Whether the request pauses (true) or resumes (false); null for text that is not a request.</summary>
-    private static bool? Read(string text)
+    /// <summary>The file's text, or null when there is no file.</summary>
+    private static async Task<string?> ReadAsync(string path, CancellationToken stoppingToken)
     {
         try
         {
-            return WireJsonParser.Parse(text) is WireObject request && request.Get("paused") is WireBool paused ? paused.Value : null;
+            return await File.ReadAllTextAsync(path, Encoding.UTF8, stoppingToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    private sealed record PauseRequest(bool Paused, DateTimeOffset RequestedAt);
+
+    /// <summary>The request the text holds; null for text that is not one.</summary>
+    private static PauseRequest? Parse(string text)
+    {
+        try
+        {
+            return WireJsonParser.Parse(text) is WireObject request
+                && request.Get("paused") is WireBool paused
+                && request.Get("requested_at") is WireString requestedAt
+                && DateTimeOffset.TryParse(requestedAt.Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
+                    ? new PauseRequest(paused.Value, at)
+                    : null;
         }
         catch (WireJsonDecodeException)
         {
@@ -166,14 +225,19 @@ public sealed class TrayPauseRequestWatcher : BackgroundService
         }
     }
 
-    private void Delete(string path)
+    /// <summary>Removes the answered file, unless the tray has written another request into it since it was read: that one is heard on its own.</summary>
+    private async Task DeleteIfUnchangedAsync(string path, string answered, CancellationToken stoppingToken)
     {
         try
         {
-            File.Delete(path);
+            if (await ReadAsync(path, stoppingToken).ConfigureAwait(false) == answered)
+            {
+                File.Delete(path);
+            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
+            // The request stays answered: it is remembered, so finding it again changes nothing.
             _logger.LogWarning(exception, "Weir could not remove the tray's pause request {Path}.", path);
         }
     }

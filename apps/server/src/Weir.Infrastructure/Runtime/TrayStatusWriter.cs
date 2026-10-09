@@ -1,6 +1,5 @@
 using System.Text;
 using System.Threading.Channels;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Weir.Core.Configuration;
@@ -19,11 +18,20 @@ namespace Weir.Infrastructure.Runtime;
 /// again whenever the pause, the files waiting on a person or the media managers that do not answer change, and a last time
 /// when the server stops cleanly, saying it is no longer running. A burst of changes is read once, at most once a
 /// <see cref="Settle"/>, and the file is replaced (whole, then renamed into place) only when its contents differ.
+/// A reading or a write that fails is tried again after <see cref="RetryAfter"/>, so what is on show is never left as an earlier run
+/// wrote it, and nothing it does can stop the server.
 /// </summary>
 public sealed class TrayStatusWriter : BackgroundService
 {
     /// <summary>The least time between one reading and the next, so a busy queue does not rewrite the file for every job.</summary>
     public static readonly TimeSpan Settle = TimeSpan.FromSeconds(1);
+
+    /// <summary>How long to wait before a reading or a write that failed is tried again.</summary>
+    public static readonly TimeSpan RetryAfter = TimeSpan.FromSeconds(2);
+
+    /// <summary>How many times the file is written, and how far apart, when the rename is refused.</summary>
+    private const int WriteAttempts = 5;
+    private static readonly TimeSpan WriteRetryAfter = TimeSpan.FromMilliseconds(100);
 
     /// <summary>The data that makes up the status: the pause, the files that wait on a person (their jobs and scans move them), and the managers.</summary>
     private static readonly HashSet<string> Topics = [DataTopics.Pause, DataTopics.Jobs, DataTopics.LibraryScan, DataTopics.Libraries, DataTopics.Connections];
@@ -74,7 +82,7 @@ public sealed class TrayStatusWriter : BackgroundService
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
         if (_status is { } last)
         {
-            Write(last with { ServerOk = false });
+            await WriteAsync(last with { ServerOk = false }, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -88,7 +96,7 @@ public sealed class TrayStatusWriter : BackgroundService
     {
         try
         {
-            await Task.WhenAll(ListenAsync(stoppingToken), WriteAsync(stoppingToken)).ConfigureAwait(false);
+            await Task.WhenAll(ListenAsync(stoppingToken), KeepWrittenAsync(stoppingToken)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -108,27 +116,40 @@ public sealed class TrayStatusWriter : BackgroundService
         }
     }
 
-    private async Task WriteAsync(CancellationToken stoppingToken)
+    /// <summary>Writes the status at once, then again after each settled change; a reading or a write that fails is tried again after <see cref="RetryAfter"/>.</summary>
+    private async Task KeepWrittenAsync(CancellationToken stoppingToken)
     {
-        await ReadAndWriteAsync(stoppingToken).ConfigureAwait(false);
+        await ReadWriteAndRetryAsync(stoppingToken).ConfigureAwait(false);
         await foreach (var _ in _stale.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
             await Task.Delay(Settle, stoppingToken).ConfigureAwait(false);
-            await ReadAndWriteAsync(stoppingToken).ConfigureAwait(false);
+            await ReadWriteAndRetryAsync(stoppingToken).ConfigureAwait(false);
         }
     }
 
-    private async Task ReadAndWriteAsync(CancellationToken stoppingToken)
+    private async Task ReadWriteAndRetryAsync(CancellationToken stoppingToken)
+    {
+        if (!await ReadAndWriteAsync(stoppingToken).ConfigureAwait(false))
+        {
+            await Task.Delay(RetryAfter, stoppingToken).ConfigureAwait(false);
+            _stale.Writer.TryWrite(true);
+        }
+    }
+
+    private async Task<bool> ReadAndWriteAsync(CancellationToken stoppingToken)
     {
         try
         {
             var status = await ReadAsync(stoppingToken).ConfigureAwait(false);
             _status = status;
-            Write(status);
+            return await WriteAsync(status, stoppingToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
+#pragma warning disable CA1031 // Nothing a reading does may stop the server; it is logged and tried again.
+        catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
         {
             _logger.LogWarning(exception, "Weir could not read what the tray shows about it; the tray may be a step behind until the next change.");
+            return false;
         }
     }
 
@@ -150,22 +171,36 @@ public sealed class TrayStatusWriter : BackgroundService
         }
     }
 
-    private void Write(TrayStatus status)
+    /// <summary>
+    /// Replaces the file when its contents differ. The tray may have it open to read when the new one is renamed into place, so a
+    /// refused rename is tried again a few times before it counts as failed.
+    /// </summary>
+    private async Task<bool> WriteAsync(TrayStatus status, CancellationToken cancellationToken)
     {
         var contents = status.ToJson();
         if (contents == _written)
         {
-            return;
+            return true;
         }
 
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            AtomicFileWriter.Replace(_options.WeirHome, TrayStatus.FileName, Encoding.UTF8.GetBytes(contents));
-            _written = contents;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            _logger.LogWarning(exception, "Weir could not tell the tray how it is; the tray may be a step behind until the next change.");
+            try
+            {
+                AtomicFileWriter.Replace(_options.WeirHome, TrayStatus.FileName, Encoding.UTF8.GetBytes(contents));
+                _written = contents;
+                return true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                if (attempt == WriteAttempts)
+                {
+                    _logger.LogWarning(exception, "Weir could not tell the tray how it is; the tray may be a step behind until the next change.");
+                    return false;
+                }
+            }
+
+            await Task.Delay(WriteRetryAfter, cancellationToken).ConfigureAwait(false);
         }
     }
 }

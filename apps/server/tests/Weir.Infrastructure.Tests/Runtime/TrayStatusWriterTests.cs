@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Weir.Core.Settings;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
@@ -18,18 +18,19 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     private readonly StoreFixture _store = new();
     private readonly DataChangePublisher _changes = new();
     private readonly SuitePauseService _pause;
+    private readonly CapturingLogger<TrayStatusWriter> _log = new();
     private readonly TrayStatusWriter _writer;
 
     public TrayStatusWriterTests()
     {
         var settings = new SuiteSettingsStore(new AuthStore(), _changes);
         _pause = new SuitePauseService(settings, new ActivityStore(), _changes);
-        _writer = new TrayStatusWriter(_store.Options, _store.Database, settings, new FileStateStore(), new MediaManagerConnectionStore(), _changes, _store.Clock, NullLogger<TrayStatusWriter>.Instance);
+        _writer = new TrayStatusWriter(_store.Options, _store.Database, settings, new FileStateStore(), new MediaManagerConnectionStore(), _changes, _store.Clock, _log);
     }
 
     private string StatusPath => Path.Join(_store.Options.WeirHome, TrayStatus.FileName);
 
-    public Task InitializeAsync() => _writer.StartAsync(CancellationToken.None);
+    public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync() => _writer.StopAsync(CancellationToken.None);
 
@@ -38,6 +39,8 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
         _writer.Dispose();
         _store.Dispose();
     }
+
+    private Task StartAsync() => _writer.StartAsync(CancellationToken.None);
 
     private JsonElement? Status()
     {
@@ -72,6 +75,7 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task The_status_is_written_when_the_server_starts_saying_all_is_well()
     {
+        await StartAsync();
         await UntilAsync(_ => true);
 
         Assert.Equal(
@@ -82,6 +86,7 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Pausing_and_resuming_are_written()
     {
+        await StartAsync();
         await UntilAsync(_ => true);
 
         await PauseAsync(paused: true, minutes: 30);
@@ -96,6 +101,7 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Files_that_wait_on_a_person_are_counted_and_the_rest_are_not()
     {
+        await StartAsync();
         await UntilAsync(_ => true);
 
         await SeedFilesAsync(
@@ -114,6 +120,7 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Enabled_managers_that_do_not_answer_are_named()
     {
+        await StartAsync();
         await UntilAsync(_ => true);
 
         await _store.Execute(
@@ -131,6 +138,7 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task A_change_that_leaves_the_status_as_it_was_does_not_rewrite_the_file()
     {
+        await StartAsync();
         await UntilAsync(_ => true);
         var written = File.GetLastWriteTimeUtc(StatusPath);
 
@@ -145,6 +153,7 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Stopping_the_server_says_it_is_no_longer_running_and_keeps_the_rest()
     {
+        await StartAsync();
         await UntilAsync(_ => true);
         await PauseAsync(paused: true);
         await UntilAsync(status => status.GetProperty("paused").GetBoolean());
@@ -154,5 +163,37 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
         var status = Status()!.Value;
         Assert.False(status.GetProperty("server_ok").GetBoolean());
         Assert.True(status.GetProperty("paused").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_reading_that_fails_is_tried_again_so_an_old_file_never_stays_on_show()
+    {
+        await PauseAsync(paused: false);
+        await File.WriteAllTextAsync(StatusPath, "{\"paused\":true,\"paused_until\":null,\"needs_you\":{\"files\":9,\"managers_unreachable\":[]},\"server_ok\":true}");
+        await _store.Execute("UPDATE suite_settings SET processing_paused_until = 'not a time' WHERE id = 1");
+
+        await StartAsync();
+        await Eventually.ThatAsync(() => _log.Logged(LogLevel.Warning, "could not read what the tray shows"));
+        Assert.True(Status()!.Value.GetProperty("paused").GetBoolean());
+
+        await _store.Execute("UPDATE suite_settings SET processing_paused_until = NULL WHERE id = 1");
+        await UntilAsync(status => !status.GetProperty("paused").GetBoolean());
+        Assert.Equal(0, Status()!.Value.GetProperty("needs_you").GetProperty("files").GetInt64());
+    }
+
+    [WindowsFact("A file that is open cannot be replaced only where file sharing is enforced.")]
+    public async Task A_file_the_tray_is_reading_is_replaced_once_it_lets_go()
+    {
+        await StartAsync();
+        await UntilAsync(_ => true);
+
+        using (new FileStream(StatusPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            await PauseAsync(paused: true);
+            await Eventually.ThatAsync(() => _log.Logged(LogLevel.Warning, "could not tell the tray how it is"));
+            Assert.False(Status()!.Value.GetProperty("paused").GetBoolean());
+        }
+
+        await UntilAsync(status => status.GetProperty("paused").GetBoolean());
     }
 }
