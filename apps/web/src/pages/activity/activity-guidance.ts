@@ -1,4 +1,7 @@
-import type { ProcessingFile } from "../../lib/processing/files-api";
+import {
+  isBelowMinimumSize,
+  type ProcessingFile,
+} from "../../lib/processing/files-api";
 
 /** A file checked while processing was paused carries that reason until something looks at it again. */
 function pausedWhenChecked(file: ProcessingFile): boolean {
@@ -47,6 +50,12 @@ const BY_STATUS: Partial<Record<ProcessingFile["status"], Guidance>> = {
   },
 };
 
+/** A file under the workflow's minimum size: the minimum doing its job, which skips samples and extras. */
+const BELOW_MINIMUM_SIZE: Guidance = {
+  title: "Left alone because it is under the workflow's minimum size.",
+  next: "Weir skips files this small, such as samples and extras, so there is nothing to do. Use Pass through unchanged only if you do want it delivered.",
+};
+
 /** A failed file with a retry still owed: Weir looks again by itself once the wait is over. */
 const RETRY_OWED: Guidance = {
   title: "This attempt failed, and Weir will try again.",
@@ -72,5 +81,6 @@ export function fileGuidance(
   if (file.status === "processing_failed" && file.next_retry_at) {
     return RETRY_OWED;
   }
+  if (isBelowMinimumSize(file)) return BELOW_MINIMUM_SIZE;
   return BY_STATUS[file.status] ?? NO_GUIDANCE;
 }

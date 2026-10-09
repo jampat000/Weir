@@ -89,6 +89,37 @@ it("says a cleaned copy no media manager has taken yet is waiting for it, and on
   expect(within(weirOnly).getByText("Done")).toBeInTheDocument();
 });
 
+it("says a file the workflow's minimum size skipped was left alone, and any other skip was skipped", () => {
+  const extra = {
+    ...download,
+    id: 4,
+    status: "skipped",
+    status_reason:
+      "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+  } as ProcessingFile;
+  const excluded = {
+    ...download,
+    id: 5,
+    status: "skipped",
+    status_reason:
+      "Skipped because its path matches this workflow's exclude patterns.",
+  } as ProcessingFile;
+  render(
+    <WithWorkflows>
+      <ListWithColumns
+        entries={[downloadEntry(extra), downloadEntry(excluded)]}
+        selectedKey={null}
+        now={NOW}
+        onPick={vi.fn()}
+      />
+    </WithWorkflows>,
+  );
+
+  const [left, skipped] = screen.getAllByRole("row").slice(1);
+  expect(within(left).getByText("Left alone")).toBeInTheDocument();
+  expect(within(skipped).getByText("Skipped")).toBeInTheDocument();
+});
+
 it("shows the title's small poster at the start of a download's row", () => {
   renderList();
 

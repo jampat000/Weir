@@ -90,18 +90,20 @@ public sealed partial class FileStateStore
 
     /// <summary>
     /// How many files wait on a person: failed, rejected, held with no clock on the hold, or skipped by one of the workflow's own
-    /// rules ("Skipped because ..."). The web app's <c>waitsOnAPerson</c> (<c>activity-entries.ts</c>) says the same, and its
-    /// badge, Needs you panel and Activity chip count the same files.
+    /// rules ("Skipped because ..."), except a file under the workflow's minimum size, which is the minimum doing its job. The
+    /// web app's <c>waitsOnAPerson</c> (<c>activity-entries.ts</c>) says the same, and its badge, Needs you panel and Activity
+    /// chip count the same files.
     /// </summary>
     public Task<long> CountWaitingOnPersonAsync(UnitOfWork uow) =>
         uow.CountAsync(
             "SELECT COUNT(*) FROM files WHERE status IN (@failed, @rejected) " +
             "OR (status = @on_hold AND hold_until IS NULL) " +
-            "OR (status = @skipped AND status_reason LIKE 'skipped because%')",
+            "OR (status = @skipped AND status_reason LIKE 'skipped because%' AND status_reason NOT LIKE @below_minimum)",
             ("@failed", ProcessingFileStatuses.ProcessingFailed),
             ("@rejected", ProcessingFileStatuses.Rejected),
             ("@on_hold", ProcessingFileStatuses.OnHold),
-            ("@skipped", ProcessingFileStatuses.Skipped));
+            ("@skipped", ProcessingFileStatuses.Skipped),
+            ("@below_minimum", LibraryAdmission.BelowMinimumSizeReasonPattern));
 
     /// <summary>Removes Weir's record; never touches the file on disk.</summary>
     public async Task ForgetAsync(UnitOfWork uow, long id)

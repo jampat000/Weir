@@ -76,6 +76,22 @@ describe("finishedFileFromEvent for a pass that ended in a rejection", () => {
   });
 });
 
+describe("finishedFileFromEvent for a pass that skipped a file", () => {
+  it("is no finished file when the workflow's minimum size left it alone: nothing was handed back", () => {
+    expect(
+      finishedFileFromEvent(
+        passEvent({
+          ok: true,
+          outcome: "skipped_guardrail",
+          guardrail: "minimum_input_file_size",
+          reason:
+            "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+        }),
+      ),
+    ).toBeNull();
+  });
+});
+
 describe("finishedFileFromEvent and the poster", () => {
   it("carries the poster address the entry names", () => {
     const entry = {

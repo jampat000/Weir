@@ -340,6 +340,24 @@ describe("the files that need a person", () => {
     expect(groups[0].rows[0].file?.id).toBe(1);
   });
 
+  it("leaves out a file under the workflow's minimum size, but lists a skip for its maximum size", () => {
+    const extra = failedFile(1, {
+      status: "skipped",
+      status_reason:
+        "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+    });
+    const tooBig = failedFile(2, {
+      status: "skipped",
+      status_reason:
+        "Skipped because this file is 90.0 MB and exceeds the 50 MB workflow maximum.",
+    });
+
+    expect(buildNeeds({ ...healthy, files: [extra] })).toEqual([]);
+    const groups = buildNeeds({ ...healthy, files: [extra, tooBig] });
+    expect(groups.map((group) => group.title)).toEqual(["1 skipped by a rule"]);
+    expect(groups[0].rows[0].file?.id).toBe(2);
+  });
+
   it("leaves a file that is waiting its turn or already finished out altogether", () => {
     const groups = buildNeeds({
       ...healthy,

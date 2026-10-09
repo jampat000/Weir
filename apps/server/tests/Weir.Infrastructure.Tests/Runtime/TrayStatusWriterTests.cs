@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Weir.Core.Processing;
 using Weir.Core.Settings;
 using Weir.Core.Time;
 using Weir.Infrastructure.Activity;
@@ -108,7 +109,8 @@ public sealed class TrayStatusWriterTests : IAsyncLifetime, IDisposable
             ("processing_failed", "Weir could not read the audio track.", false),
             ("rejected", "Nothing was left to keep.", false),
             ("on_hold", "Waiting for a decision.", false),
-            ("skipped", "Skipped because this file is 3.0 MB, under the 10 MB minimum.", false),
+            ("skipped", LibraryAdmission.BelowMinimumSizeReason(3.0, 10), false),
+            ("skipped", "Skipped because this file is 90.0 MB and exceeds the 50 MB workflow maximum.", false),
             ("on_hold", "Waiting until the file stops changing.", true),
             ("skipped", "Already in the format you keep.", false),
             ("processed", "Finished processing this file.", false));

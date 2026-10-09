@@ -143,6 +143,25 @@ describe("the Needs you panel when nothing needs a person", () => {
     expect(panel).not.toHaveTextContent("to look at");
     expect(screen.queryByTestId("live-needs")).toBeNull();
   });
+
+  it("stays clear for an extra the workflow's minimum size left alone", () => {
+    needFiles.files = [
+      file({
+        id: 21,
+        relative_path: "Nosferatu.1922/Gallery.mkv",
+        status: "skipped",
+        failure_class: null,
+        status_reason:
+          "Skipped because this file is 12.1 MB, under the 50 MB minimum.",
+      }),
+    ];
+
+    const panel = renderPanel();
+
+    expect(within(panel).getByText("All clear")).toBeInTheDocument();
+    expect(panel).not.toHaveTextContent("Excluded by a rule");
+    expect(screen.queryByTestId("live-needs")).toBeNull();
+  });
 });
 
 describe("the Needs you panel narrowed to one kind of work", () => {

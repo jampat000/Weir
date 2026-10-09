@@ -59,6 +59,9 @@ public static class LibraryAdmission
     public static string BelowMinimumSizeReason(double sizeMb, long minimumMb) =>
         $"Skipped because this file is {sizeMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, under the {minimumMb} MB minimum.";
 
+    /// <summary>The SQL <c>LIKE</c> pattern that matches every reason <see cref="BelowMinimumSizeReason"/> writes.</summary>
+    public const string BelowMinimumSizeReasonPattern = "Skipped because this file is % MB, under the % MB minimum.%";
+
     /// <summary>The plain-language reason and summary counter for a
     /// settled file the library's rules refuse, or <see langword="null"/> when it is admitted.</summary>
     public static LibraryAdmissionRejection? Rejection(

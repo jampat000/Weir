@@ -86,12 +86,19 @@ function count(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
 
-/** The finished file an Activity entry describes, or null for any other kind of entry. */
+/** The guardrail that skips a file under the workflow's minimum size (`RemuxPassRunner.InputGuardrails`). */
+const MINIMUM_SIZE_GUARDRAIL = "minimum_input_file_size";
+
+/**
+ * The finished file an Activity entry describes, or null for any other kind of entry. A file the workflow's minimum size
+ * left alone is none: nothing was written or handed back for it.
+ */
 export function finishedFileFromEvent(
   ev: ActivityEventItem,
 ): FinishedFile | null {
   const detail = parseActivityDetail(ev.detail);
   if (ev.event_type === REMUX_PASS_COMPLETED_EVENT) {
+    if (asString(detail?.guardrail) === MINIMUM_SIZE_GUARDRAIL) return null;
     const outcome = asString(detail?.outcome) ?? "";
     const passed = detail?.pass_through_unchanged === true;
     const rejected = isRejectedByRules(detail);

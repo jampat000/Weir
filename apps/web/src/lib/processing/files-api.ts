@@ -24,13 +24,30 @@ const PROCESSING_FILE_STATUS_LABELS: Record<ProcessingFileStatus, string> = {
 /** How the server marks a rejection by the rules themselves, where no media manager was asked for another copy. */
 export const REJECTED_BY_RULES = "rules";
 
-/** The plain word for a file's state. A rejection no media manager was asked about is just "Rejected". */
+/** How the server words a skip for a file under the workflow's minimum size (`LibraryAdmission.BelowMinimumSizeReason`). */
+const BELOW_MINIMUM_SIZE =
+  /^skipped because this file is [\d.]+ MB, under the \d+ MB minimum/i;
+
+/** Whether the workflow's minimum size left the file alone: that is the minimum doing its job, and needs nobody. */
+export function isBelowMinimumSize(
+  file: Pick<ProcessingFile, "status" | "status_reason">,
+): boolean {
+  return (
+    file.status === "skipped" && BELOW_MINIMUM_SIZE.test(file.status_reason)
+  );
+}
+
+/**
+ * The plain word for a file's state. A rejection no media manager was asked about is just "Rejected", and a file
+ * under the minimum size is "Left alone".
+ */
 export function processingFileStatusLabel(
-  file: Pick<ProcessingFile, "status" | "failure_class">,
+  file: Pick<ProcessingFile, "status" | "failure_class" | "status_reason">,
 ): string {
   if (file.status === "rejected" && file.failure_class === REJECTED_BY_RULES) {
     return "Rejected";
   }
+  if (isBelowMinimumSize(file)) return "Left alone";
   return PROCESSING_FILE_STATUS_LABELS[file.status] ?? file.status;
 }
 
