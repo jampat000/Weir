@@ -11215,6 +11215,17 @@
           "jobs_today": {
             "$ref": "#/components/schemas/SystemOverviewJobsOut"
           },
+          "last_update_backup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemOverviewUpdateBackupOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The copy of Weir's data taken before the latest update changed it; null when no update has made one."
+          },
           "requests": {
             "$ref": "#/components/schemas/SystemOverviewRequestsOut"
           },
@@ -11267,7 +11278,8 @@
           "requests",
           "jobs_today",
           "restarts_this_week",
-          "checks"
+          "checks",
+          "last_update_backup"
         ],
         "title": "SystemOverviewOut",
         "type": "object"
@@ -11300,6 +11312,53 @@
           "errors_today"
         ],
         "title": "SystemOverviewRequestsOut",
+        "type": "object"
+      },
+      "SystemOverviewUpdateBackupOut": {
+        "description": "A copy of Weir's data taken before an update changed it.",
+        "properties": {
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version of Weir that was running when the copy was taken; null when the server that took it did not know (a copy taken as the new version started).",
+            "title": "From Version"
+          },
+          "in_data_folder": {
+            "description": "Whether the copy is inside Weir's data folder (in Docker, the WEIR_HOME volume).",
+            "title": "In Data Folder",
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Where the copy of the database is, on the computer Weir runs on.",
+            "title": "Path",
+            "type": "string"
+          },
+          "taken_at": {
+            "description": "When the copy was taken.",
+            "format": "date-time",
+            "title": "Taken At",
+            "type": "string"
+          },
+          "to_version": {
+            "description": "The version of Weir the update was to.",
+            "title": "To Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "taken_at",
+          "from_version",
+          "to_version",
+          "in_data_folder"
+        ],
+        "title": "SystemOverviewUpdateBackupOut",
         "type": "object"
       },
       "SystemOverviewUpdateOut": {
@@ -12170,6 +12229,11 @@
               }
             ],
             "title": "Failure"
+          },
+          "not_updated_reason": {
+            "description": "Present only while the tray holds the downloaded update back because it could not save a copy of Weir's data first: why, in plain words, and what to do.",
+            "title": "Not Updated Reason",
+            "type": "string"
           },
           "pending_version": {
             "anyOf": [

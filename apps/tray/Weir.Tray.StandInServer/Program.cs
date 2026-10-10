@@ -22,6 +22,16 @@ const string ReadyLine = "ready";
 const int StoppedExitCode = 0;
 const int LifetimeEndedExitCode = 1;
 
+// A server that cannot start: when fail-start.txt sits beside it, it counts the start in starts.txt, writes that file's text to
+// startup-error.txt in WEIR_HOME as the real server does when it refuses to start, and exits at once with code 1.
+var failStart = Path.Combine(AppContext.BaseDirectory, "fail-start.txt");
+if (File.Exists(failStart))
+{
+    File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "starts.txt"), "start\n");
+    File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("WEIR_HOME")!, "startup-error.txt"), File.ReadAllText(failStart));
+    return LifetimeEndedExitCode;
+}
+
 // Bounds how long a process orphaned by a killed test run can linger.
 var lifetime = TimeSpan.FromMinutes(2);
 

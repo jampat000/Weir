@@ -18,7 +18,7 @@ public sealed class SystemOverviewApiTests(ServerFixture fixture) : IClassFixtur
     private static readonly string[] OverviewFields =
     [
         "version", "update", "uptime_seconds", "started_at", "runs_as", "address", "data_bytes", "browsers_live",
-        "requests", "jobs_today", "restarts_this_week", "checks",
+        "requests", "jobs_today", "restarts_this_week", "checks", "last_update_backup",
     ];
 
     private static readonly string[] TaskFields =
@@ -93,6 +93,8 @@ public sealed class SystemOverviewApiTests(ServerFixture fixture) : IClassFixtur
         Assert.Equal(["passing", "total"], KeysInOrder(overview["checks"]));
         var checks = overview["checks"]!;
         Assert.True(0 <= (long)checks["passing"]! && (long)checks["passing"]! <= (long)checks["total"]!);
+        // A server that began on an empty folder has not updated, so no copy was taken.
+        Assert.Null(overview["last_update_backup"]);
     }
 
     [Fact]

@@ -185,7 +185,14 @@ static class Program
             // nothing is running that the install could interrupt (#857).
             var updateService = new UpdateService(TrayLog.Write);
             var updateSettings = UpdateSettings.Load(runtimeHome);
-            if (UpdateOnStart.TryApply(updateService, updateSettings.Mode, runtimeHome, StopOrphanedServers))
+            Func<RunningServer?> orphan = () => UpdateBackupReady.FindLiveServer(runtimeHome);
+            var backup = new UpdateBackupHook(
+                new UpdateBackupRequest(runtimeHome, TimeProvider.System, orphan).AskAsync,
+                runtimeHome,
+                () => orphan() is not null,
+                reason => TrayLog.Write($"Weir did not update because it could not save a copy of its data: {reason}"));
+            if (UpdateOnStart.TryApply(
+                updateService, updateSettings.Mode, runtimeHome, StopOrphanedServers, backup, () => orphan() is not null))
             {
                 return 0;
             }

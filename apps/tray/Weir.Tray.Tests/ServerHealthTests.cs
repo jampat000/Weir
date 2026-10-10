@@ -69,6 +69,28 @@ public sealed class ServerHealthTests
     }
 
     [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_that_has_said_it_is_busy_is_waited_for_past_the_timeout_and_given_up_on_once_it_is_not()
+    {
+        var clock = new DelayWatchingTimeProvider();
+        var handler = new ScriptedHandler(_ => HttpStatusCode.ServiceUnavailable);
+        using var client = new HttpClient(handler);
+        var busy = true;
+        var timing = new ServerHealth.Timing(Pause * 2, Pause, clock, StillWorking: () => busy);
+
+        var waiting = ServerHealth.WaitUntilReadyAsync(client, ReadyUrl, () => null, timing, CancellationToken.None);
+        for (var i = 0; i < 20; i++)
+        {
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, clock.NextDelay()));
+            clock.Advance(Pause);
+        }
+
+        Assert.False(waiting.IsCompleted);
+        busy = false;
+        await DriveUntilDone(waiting, clock);
+        await Assert.ThrowsAsync<TimeoutException>(() => waiting);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
     public async Task Nothing_listening_ends_in_a_timeout_not_a_network_error()
     {
         var clock = new DelayWatchingTimeProvider();
@@ -129,6 +151,78 @@ public sealed class ServerHealthTests
         await waiting;
         Assert.Equal(30, handler.Calls);
     }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_busy_saving_a_copy_that_has_not_started_listening_is_waited_for_past_the_short_limit()
+    {
+        var clock = new DelayWatchingTimeProvider();
+        var handler = new ScriptedHandler(_ => throw new HttpRequestException("No connection could be made"));
+        using var client = new HttpClient(handler);
+        var busy = true;
+        var timing = new ServerHealth.Timing(Pause * 2, Pause, clock, Pause * 20, () => busy);
+
+        var waiting = ServerHealth.WaitUntilReadyAsync(client, ReadyUrl, () => null, timing, CancellationToken.None);
+        for (var i = 0; i < 60; i++)
+        {
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, clock.NextDelay()));
+            clock.Advance(Pause);
+        }
+
+        Assert.False(waiting.IsCompleted);
+        busy = false;
+        await DriveUntilDone(waiting, clock);
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => waiting);
+        Assert.Contains("No connection could be made", error.Message);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_that_answers_not_ready_and_is_busy_saving_a_copy_is_waited_for_past_the_long_limit()
+    {
+        var clock = new DelayWatchingTimeProvider();
+        var handler = new ScriptedHandler(_ => HttpStatusCode.ServiceUnavailable);
+        using var client = new HttpClient(handler);
+        var busy = true;
+        var timing = new ServerHealth.Timing(Pause * 2, Pause, clock, Pause * 8, () => busy);
+
+        var waiting = ServerHealth.WaitUntilReadyAsync(client, ReadyUrl, () => null, timing, CancellationToken.None);
+        for (var i = 0; i < 40; i++)
+        {
+            Assert.NotSame(waiting, await Task.WhenAny(waiting, clock.NextDelay()));
+            clock.Advance(Pause);
+        }
+
+        Assert.False(waiting.IsCompleted);
+        busy = false;
+        await DriveUntilDone(waiting, clock);
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => waiting);
+        Assert.Contains("HTTP 503", error.Message);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_that_stops_saying_it_is_busy_is_given_up_on_at_the_limit_that_applies_to_it()
+    {
+        // Each wait has a clock of its own: a read left waiting on one clock's delays must not take the other's.
+        var refusingClock = new DelayWatchingTimeProvider();
+        var refusing = new ScriptedHandler(_ => throw new HttpRequestException("No connection could be made"));
+        using var refusingClient = new HttpClient(refusing);
+        var refused = ServerHealth.WaitUntilReadyAsync(
+            refusingClient, ReadyUrl, () => null, NeverBusy(refusingClock), CancellationToken.None);
+        await DriveUntilDone(refused, refusingClock);
+        await Assert.ThrowsAsync<TimeoutException>(() => refused);
+
+        var startingClock = new DelayWatchingTimeProvider();
+        var notReady = new ScriptedHandler(_ => HttpStatusCode.ServiceUnavailable);
+        using var notReadyClient = new HttpClient(notReady);
+        var starting = ServerHealth.WaitUntilReadyAsync(
+            notReadyClient, ReadyUrl, () => null, NeverBusy(startingClock), CancellationToken.None);
+        await DriveUntilDone(starting, startingClock);
+        await Assert.ThrowsAsync<TimeoutException>(() => starting);
+
+        Assert.Equal(3, refusing.Calls);
+        Assert.Equal(9, notReady.Calls);
+    }
+
+    private static ServerHealth.Timing NeverBusy(TimeProvider clock) => new(Pause * 2, Pause, clock, Pause * 8, () => false);
 
     [Fact(Timeout = TestTimeoutMs)]
     public async Task A_server_that_exited_fails_at_once_with_its_exit_code()

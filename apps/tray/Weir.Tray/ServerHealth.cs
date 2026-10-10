@@ -14,9 +14,16 @@ static class ServerHealth
     /// <summary>
     /// How long to keep asking while nothing answers, how long to pause between attempts, and the clock both are measured on. Once
     /// the server has answered with anything but 200 it is alive and starting, and <paramref name="WhenStarting"/>, when given and
-    /// longer, is how long it is then kept waiting for.
+    /// longer, is how long it is then kept waiting for. While <paramref name="StillWorking"/> says yes the wait goes on past either
+    /// limit: it is how a server that is alive and has said it is busy (saving a copy of the data before an update) is not given up
+    /// on, for as long as its own note stays fresh.
     /// </summary>
-    internal sealed record Timing(TimeSpan Timeout, TimeSpan RetryDelay, TimeProvider Clock, TimeSpan? WhenStarting = null);
+    internal sealed record Timing(
+        TimeSpan Timeout,
+        TimeSpan RetryDelay,
+        TimeProvider Clock,
+        TimeSpan? WhenStarting = null,
+        Func<bool>? StillWorking = null);
 
     /// <summary>
     /// Returns once <paramref name="readyUrl"/> answers 200. Throws <see cref="InvalidOperationException"/> as soon
@@ -52,7 +59,7 @@ static class ServerHealth
                 limit = whenStarting;
             }
 
-            if (timing.Clock.GetElapsedTime(started) >= limit)
+            if (timing.Clock.GetElapsedTime(started) >= limit && timing.StillWorking?.Invoke() != true)
             {
                 throw new TimeoutException(
                     $"Weir did not answer {readyUrl} within {limit.TotalSeconds:0.#}s (last attempt: {answer}).");

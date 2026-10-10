@@ -77,6 +77,48 @@ public sealed class ServerHostTests : IDisposable
     }
 
     [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_server_saving_a_copy_before_an_update_is_waited_for_past_both_limits_while_it_keeps_saying_so()
+    {
+        // Ready three seconds after it starts listening, which is after both one-second limits; its note says it is busy meanwhile.
+        var host = Host(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), readyAfterMs: "3000");
+        using var done = new CancellationTokenSource();
+        var note = Task.Run(async () =>
+        {
+            while (!done.IsCancellationRequested)
+            {
+                File.WriteAllText(Path.Combine(_home.Path, StartupNotes.ProgressFileName), "saving a copy");
+                await Task.Delay(100, CancellationToken.None);
+            }
+        }, CancellationToken.None);
+
+        try
+        {
+            await host.StartAsync(CancellationToken.None);
+        }
+        finally
+        {
+            await done.CancelAsync();
+            await note;
+        }
+
+        Assert.True(host.ServerIsRunning);
+        Assert.Equal(ServerPhase.Running, host.Phase);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_progress_note_the_last_server_left_does_not_stretch_the_limits()
+    {
+        var lastServersNote = Path.Combine(_home.Path, StartupNotes.ProgressFileName);
+        File.WriteAllText(lastServersNote, "saving a copy");
+        File.SetLastWriteTimeUtc(lastServersNote, DateTime.UtcNow.AddSeconds(-30));
+        var host = Host(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), readyAfterMs: "-1");
+
+        await Assert.ThrowsAsync<TimeoutException>(() => host.StartAsync(CancellationToken.None));
+
+        Assert.False(host.ServerIsRunning);
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
     public async Task The_icon_says_stopping_while_the_server_finishes_and_stopped_after()
     {
         var host = Host(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30), stopAfterMs: "1000");

@@ -228,7 +228,11 @@ docker stop weir && docker rm weir
 ```
 
 Your data is in `weir-data`, so it carries over. Take a backup first (below). Going back to an older version
-after an upgrade is only safe from a backup made before it.
+after an upgrade is only safe from a backup made before it. When the new version has to change the database, it first
+saves a copy of the database, your settings files and the two secrets in `weir-data/backups/pre-update` (the newest five
+are kept), and does not start if it cannot, saying why in the container log. It logs "Saving a copy of Weir's data (N MB)
+before updating…" first; the image's healthcheck allows five minutes for that. If you set your own `healthcheck:`, give it a
+`start_period` as long as the copy takes. **System › About** says where the latest copy is, inside the `weir-data` volume.
 
 ## Back up
 

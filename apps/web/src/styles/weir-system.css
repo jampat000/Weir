@@ -68,6 +68,11 @@
   line-height: 1.45;
 }
 
+/* A path in a note is one long word; let it wrap rather than push the card wider. */
+.mm-sys-note code {
+  overflow-wrap: anywhere;
+}
+
 /* A link inside a value or a sentence: the text's own size, in the accent. */
 .mm-sys-link {
   color: var(--mm-accent);

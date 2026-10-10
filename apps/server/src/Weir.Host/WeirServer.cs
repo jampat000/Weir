@@ -195,15 +195,35 @@ public static class WeirServer
     private static void OpenDatabase(WebApplication app, WeirOptions options, ILogger logger)
     {
         var database = app.Services.GetRequiredService<SqliteDatabase>();
+        StartupNotes.ClearStale(options.WeirHome);
+        var time = app.Services.GetRequiredService<TimeProvider>();
+        IDisposable? progress = null;
+        var backup = new PreUpdateBackup(
+            options.BackupDir,
+            options.WeirHome,
+            WeirVersion.Resolve(options.VersionOverride),
+            time,
+            logger,
+            saving: sentence => progress = StartupNotes.BeginProgress(options.WeirHome, sentence, time));
         SchemaStartupOutcome outcome;
         try
         {
-            outcome = new SchemaMigrator(database).EnsureAtHead();
+            outcome = new SchemaMigrator(database).EnsureAtHead((connection, revision) => backup.Save(connection, revision));
         }
         catch (DatabaseSchemaMismatchException exception)
         {
             logger.LogCritical("Weir cannot open the database kind={Kind}: {Message}", exception.Kind, exception.Message);
             throw;
+        }
+        catch (PreUpdateBackupException exception)
+        {
+            logger.LogCritical("{Message}", exception.Message);
+            StartupNotes.WriteError(options.WeirHome, PreUpdateBackupException.Headline, exception.Message);
+            throw;
+        }
+        finally
+        {
+            progress?.Dispose();
         }
 
         if (outcome == SchemaStartupOutcome.Created)

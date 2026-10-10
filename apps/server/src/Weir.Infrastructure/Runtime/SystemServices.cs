@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using Weir.Core.Configuration;
 using Weir.Core.Json;
 using Weir.Core.Updates;
@@ -26,6 +27,9 @@ public sealed class UpdateFiles
 
     /// <summary>How old a check or download flag may be and still read as under way: the tray takes one up within a second.</summary>
     public static readonly TimeSpan RequestMaxAge = TimeSpan.FromMinutes(2);
+
+    /// <summary>The tray's record of an update it held back for want of a copy of Weir's data: <c>{ "version": …, "reason": … }</c>.</summary>
+    public const string NotAppliedFileName = "update-not-applied.json";
 
     /// <summary>What the tray reads to learn whether Weir is idle; written only while an update waits to install (#875).</summary>
     public const string WorkStateFileName = "work-state.json";
@@ -117,12 +121,14 @@ public sealed class UpdateFiles
     /// <summary>
     /// Read the update state the tray writes; a missing or unreadable file reads as the default state. A check or download that
     /// was asked for and not yet taken up by the tray reads as under way, so the person sees their click at once, and
-    /// <c>tray_running</c> says whether there is a tray to answer.
+    /// <c>tray_running</c> says whether there is a tray to answer. While the tray holds an update back because it could not save
+    /// a copy of Weir's data first (<see cref="NotAppliedFileName"/>), the state also says why.
     /// </summary>
     public WireObject ReadState()
     {
         var alive = TrayIsRunning();
-        return StateAsShown(ReadStateFile(), alive).Set("tray_running", alive);
+        var state = StateAsShown(ReadStateFile(), alive).Set("tray_running", alive);
+        return ReadNotAppliedReason() is { } reason ? state.Set("not_updated_reason", reason) : state;
     }
 
     // A step the tray says it is at, when no tray is there, is a step nobody is taking: it reads as idle. A request the tray
@@ -169,6 +175,24 @@ public sealed class UpdateFiles
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DecoderFallbackException)
         {
             return UpdateStatus.ParseUpdateState(null);
+        }
+    }
+
+    private string? ReadNotAppliedReason()
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Join(_options.WeirHome, NotAppliedFileName)));
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("reason", out var reason)
+                && reason.ValueKind == JsonValueKind.String
+                && reason.GetString() is { Length: > 0 } text
+                    ? text
+                    : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
         }
     }
 

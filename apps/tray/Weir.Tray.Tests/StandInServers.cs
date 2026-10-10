@@ -31,9 +31,10 @@ internal sealed class StandInServers : IDisposable
         StartNamedAsync(directory, "Weir.exe", ["no-stop-event"]);
 
     /// <summary>Puts a stand-in server named WeirServer.exe in <paramref name="directory"/> without starting it, for a test that starts it through the code under test.</summary>
-    public static void Install(string directory) => InstallNamed(directory, "WeirServer.exe");
+    public static void Install(string directory) => Place(directory, "WeirServer.exe");
 
-    private static string InstallNamed(string directory, string executableName)
+    /// <summary>Puts a stand-in server in <paramref name="directory"/> as <paramref name="executableName"/> without starting it, and returns its path.</summary>
+    internal static string Place(string directory, string executableName)
     {
         Directory.CreateDirectory(directory);
         foreach (var file in StandInServerFiles)
@@ -47,7 +48,7 @@ internal sealed class StandInServers : IDisposable
 
     private async Task<Process> StartNamedAsync(string directory, string executableName, string[] arguments)
     {
-        var exe = InstallNamed(directory, executableName);
+        var exe = Place(directory, executableName);
         var start = new ProcessStartInfo(exe) { UseShellExecute = false, RedirectStandardOutput = true };
         foreach (var argument in arguments)
         {

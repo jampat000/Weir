@@ -42,6 +42,8 @@ export type UpdateStateOut = {
   failure: string | null;
   /** Whether a tray is there to take a request: not on Docker or source, and not once the tray has gone quiet. */
   tray_running: boolean;
+  /** Why the tray held the update back: it could not save a copy of Weir's data first. Absent otherwise. */
+  not_updated_reason?: string;
 };
 
 export type HistoryResetResult = Schema<"SuiteOperationalHistoryResetOut">;

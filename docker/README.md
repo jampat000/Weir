@@ -257,7 +257,10 @@ volumes:
 
 ## Health
 
-The image exposes `GET /health` and includes a Docker `HEALTHCHECK`.
+The image exposes `GET /health` and includes a Docker `HEALTHCHECK`. Its start period is five minutes: a new image that
+has to change the database saves a copy of it in `backups/pre-update` first (it logs "Saving a copy of Weir's data (N MB)
+before updating…" when it starts), and the container is not reported unhealthy while that runs. If you set your own
+`healthcheck:` in compose, give it a `start_period` as long as the copy of your database takes.
 
 ## Hardware acceleration and device passthrough
 

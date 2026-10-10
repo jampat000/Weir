@@ -82,6 +82,16 @@ public sealed class TrayHandOffWatcherTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task An_update_the_tray_held_back_for_want_of_a_copy_of_the_data_is_announced()
+    {
+        using var heard = _changes.Subscribe();
+
+        await File.WriteAllTextAsync(Path.Join(Home, UpdateFiles.NotAppliedFileName), "{\"version\": \"9.9.9\", \"reason\": \"The drive is full.\"}");
+
+        Assert.Equal(DataTopics.Update, await NextAsync(heard));
+    }
+
+    [Fact]
     public async Task A_choice_saved_for_the_tray_is_announced_even_when_it_is_the_same_choice()
     {
         var choice = new LanAccessFile(Home);

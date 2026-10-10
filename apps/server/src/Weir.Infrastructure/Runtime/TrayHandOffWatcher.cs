@@ -29,6 +29,7 @@ public sealed class TrayHandOffWatcher : BackgroundService
     {
         [UpdateFiles.StateFileName] = DataTopics.Update,
         [UpdateFiles.SettingsFileName] = DataTopics.Update,
+        [UpdateFiles.NotAppliedFileName] = DataTopics.Update,
         [LanAccessFile.FileName] = DataTopics.NetworkAccess,
     };
 

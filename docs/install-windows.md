@@ -122,7 +122,13 @@ A release candidate is offered the next release candidate as well as stable rele
 ever offered stable ones. You can also download the new `Weir-win-Setup.exe` from the Releases page and run it.
 It installs over the old one. Your data is not touched.
 
-Before a big upgrade, take a backup under **System › Backups**.
+Before the tray applies an update, the Weir that is still running saves a copy of your data in
+`C:\ProgramData\Weir\backups\pre-update`: the database, your settings files and the two secrets (the newest five copies
+are kept). If it can't (the drive is full, say), Weir does not update: the old version keeps running, a balloon and
+**System › About** say why, and the next update check tries again. The new version then saves a copy of its own when it starts, so an update that arrives another way, such as
+running `Weir-win-Setup.exe` over the top, is covered too; if that fails Weir stays stopped and the tray's hover text and
+balloon say why. A Weir still running when the tray starts with an update waiting is asked for its copy first. **System › About** says where the latest copy is. Before a big upgrade you can also take
+a backup under **System › Backups**.
 
 ## Uninstall
 
