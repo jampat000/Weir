@@ -20,7 +20,7 @@ Copy this list into the run's record and tick each line with what was seen.
 
 1. **Install.**
    - [ ] The clean checkpoint is reverted.
-   - [ ] The exact-SHA Deluno installer runs. In the picker, tick the five download clients plus Weir. Weir's source is the exact-SHA `weir-windows-<sha>`, and the install log names its version and sha256.
+   - [ ] The exact-SHA Deluno installer runs. In the picker, tick the five download clients plus Weir. Weir comes from the picker's own lookup of its latest release, and the run record names Weir's version and its installer's sha256.
    - [ ] The picker shows progress and a finish screen, and offers to open Deluno.
    - [ ] Weir answers on this PC only, and its tray starts silently.
 2. **Clients come up ready.**
@@ -33,13 +33,13 @@ Copy this list into the run's record and tick each line with what was seen.
 4. **Public trackers.**
    - [ ] At least three test Healthy, and the result is kept after Add.
    - [ ] Routing is automatic.
-   - [ ] 1337x works through the Cloudflare helper.
+   - [ ] 1337x works through the Cloudflare helper when one is set up. Without one, its test says plainly that a helper is needed.
 5. **Usenet** (round two on).
    - [ ] The provider is entered once.
    - [ ] SABnzbd and NZBGet show Healthy only after it is set.
    - [ ] At least one Newznab indexer is Healthy.
 6. **The real path.** One torrent film, one Usenet film, one TV episode, and one 4:3 film (Nosferatu, 1922, 1440×1080). For each:
-   - [ ] Download, then hand-off to Weir with the completed path. Weir shows it moving through the lanes Incoming, Queued, Analysing, Processing and Delivering. Weir cleans it, and Deluno imports it, renamed.
+   - [ ] Download, then hand-off to Weir with the completed path. Weir shows it moving through its lanes: at least Queued, Analysing and Processing. Incoming and Delivering can pass too quickly to see. Weir cleans it, and Deluno imports it, renamed.
    - [ ] Posters show.
    - [ ] The download client's folder still holds every original file: the video, the `.nfo` and every other sidecar.
    - [ ] Activity tells the story in plain words, in both apps. Weir's entry is correct: the tracks kept and removed, the size before and after, and what was saved.
@@ -51,7 +51,7 @@ Copy this list into the run's record and tick each line with what was seen.
    - [ ] Remove a title with its files, restore it from the recycle bin, and the title is back.
 9. **Weir's pause and repeats.**
    - [ ] Pause Weir "until I resume" with **Keep looking for new files** on. A hand-off during the pause waits, and nothing is processed or removed. On resume it is processed once. Weir's Activity shows Paused and Resumed.
-   - [ ] In Weir, **Process again** on a file already cleaned settles as "Skipped: already done", with no second output. Deluno never sends a finished hand-off a second time, so the repeat is started from Weir.
+   - [ ] In Weir, **Process again** on a file already cleaned says Weir already cleaned this file and skipped it, with no second output. Deluno never sends a finished hand-off a second time, so the repeat is started from Weir.
 10. **Reaching Weir from another computer.**
     - [ ] In Weir's **System › About**, **Devices on my network** makes Weir reachable from another computer, with the VM's network set to Public.
 11. **Screens.**
