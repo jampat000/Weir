@@ -54,11 +54,19 @@ public sealed class TrayUpdateBackupWatcherTests : IDisposable
     private async Task<JsonNode> FinalResultAsync(string id = Id)
     {
         JsonNode? result = null;
-        await Eventually.ThatAsync(() =>
+        try
         {
-            result = ResultFor(id);
-            return (string?)result?["state"] is "saved" or "failed";
-        });
+            await Eventually.ThatAsync(() =>
+            {
+                result = ResultFor(id);
+                return (string?)result?["state"] is "saved" or "failed";
+            });
+        }
+        catch (Xunit.Sdk.XunitException)
+        {
+            Assert.Fail($"No final answer. Last seen: {result?.ToJsonString() ?? "none"}. Request still there: {File.Exists(RequestPath)}. Log: {string.Join(" | ", _log.Messages.Select(m => m.Level + " " + m.Message))}");
+        }
+
         return result!;
     }
 
@@ -86,6 +94,27 @@ public sealed class TrayUpdateBackupWatcherTests : IDisposable
         var latest = PreUpdateBackup.Latest(_store.Options.BackupDir);
         Assert.Equal("1.0.0-rc.13", latest?.ToVersion);
         Assert.False(string.IsNullOrEmpty(latest?.FromVersion));
+    }
+
+    [Fact]
+    public async Task While_it_listens_the_server_says_it_can_take_the_request_and_stops_saying_so_when_it_stops()
+    {
+        var ready = Path.Join(_store.Options.WeirHome, TrayUpdateBackupWatcher.ReadyFileName);
+        Assert.False(File.Exists(ready));
+
+        await _watcher.StartAsync(CancellationToken.None);
+
+        var marker = JsonNode.Parse(await File.ReadAllTextAsync(ready))!;
+        using var self = System.Diagnostics.Process.GetCurrentProcess();
+        Assert.Equal(self.Id, (int)marker["pid"]!);
+        Assert.InRange(
+            (DateTimeOffset.Parse((string)marker["started_at"]!, System.Globalization.CultureInfo.InvariantCulture) - self.StartTime.ToUniversalTime()).Duration(),
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(1));
+
+        await _watcher.StopAsync(CancellationToken.None);
+
+        Assert.False(File.Exists(ready));
     }
 
     [Fact]

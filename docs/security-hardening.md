@@ -45,7 +45,9 @@ This checklist defines the current practical hardening baseline for Weir.
 - To rotate `WEIR_CREDENTIALS_SECRET`, set the new value as `WEIR_CREDENTIALS_SECRET`, add the old value to
   `WEIR_PREVIOUS_CREDENTIALS_SECRETS`, restart Weir, then re-save every media manager
   connection (Setup › Connections › Media managers). After every saved credential has been re-written with the new value, remove the old value from
-  `WEIR_PREVIOUS_CREDENTIALS_SECRETS` and restart again.
+  `WEIR_PREVIOUS_CREDENTIALS_SECRETS` and restart again. Copies already in `backups/pre-update` keep the credentials secret
+  they were made with (their `.credentials.secret` file) and the keys encrypted with it; they do not follow the rotation, so
+  delete them once you no longer need them, or keep them as a pair.
 
 ## Repository and dependency controls
 

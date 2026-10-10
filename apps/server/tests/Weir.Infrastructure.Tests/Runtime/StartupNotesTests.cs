@@ -32,6 +32,29 @@ public sealed class StartupNotesTests : IDisposable
     }
 
     [Fact]
+    public void Progress_is_touched_every_ten_seconds_while_the_work_runs_and_removed_when_it_ends()
+    {
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 10, 9, 0, 0, TimeSpan.Zero));
+        var path = _home.Join(StartupNotes.ProgressFileName);
+
+        var progress = StartupNotes.BeginProgress(_home.Path, "Saving a copy", time);
+        File.SetLastWriteTimeUtc(path, time.GetUtcNow().UtcDateTime - TimeSpan.FromMinutes(5));
+
+        time.Advance(StartupNotes.ProgressInterval);
+        Assert.Equal(time.GetUtcNow().UtcDateTime, File.GetLastWriteTimeUtc(path));
+        Assert.Equal("Saving a copy", File.ReadAllText(path));
+
+        time.Advance(StartupNotes.ProgressInterval);
+        Assert.Equal(time.GetUtcNow().UtcDateTime, File.GetLastWriteTimeUtc(path));
+
+        progress.Dispose();
+        Assert.False(File.Exists(path));
+
+        time.Advance(StartupNotes.ProgressInterval);
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
     public void A_start_removes_what_the_last_one_left()
     {
         StartupNotes.WriteProgress(_home.Path, "busy");

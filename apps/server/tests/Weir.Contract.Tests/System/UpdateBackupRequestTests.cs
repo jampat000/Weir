@@ -41,6 +41,19 @@ public sealed class UpdateBackupRequestTests(ServerFixture fixture) : IClassFixt
     }
 
     [Fact]
+    public async Task A_running_server_says_it_can_take_the_request()
+    {
+        var ready = await Poll.UntilAsync(
+            () => Task.FromResult(File.Exists(Path.Combine(Server.Home, "update-backup-ready"))
+                ? JsonNode.Parse(File.ReadAllText(Path.Combine(Server.Home, "update-backup-ready")))
+                : null),
+            "the server to say it can take a request for a copy of its data");
+
+        Assert.True((int)ready["pid"]! > 0);
+        Assert.EndsWith("Z", (string)ready["started_at"]!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_running_server_saves_a_consistent_copy_of_its_data_when_asked()
     {
         var answer = await AskAsync("contract-saved", "9.9.9");

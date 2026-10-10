@@ -20,6 +20,9 @@ static class TrayBalloons
     /// <summary>The server exited and could not be brought back, and said why. A click restarts it.</summary>
     internal static string StoppedBecause(StartupError why) => $"Weir stopped. {why.Detail} Click to try again.";
 
+    /// <summary>A second request to apply an update arrived while the first was under way.</summary>
+    internal const string UpdateUnderWayText = "An update is already being installed.";
+
     /// <summary>The person clicked the icon or Open Weir while the server was starting.</summary>
     internal const string StillStartingText = "Weir is still starting. Try again in a moment.";
 

@@ -68,6 +68,10 @@ sealed class ServerHost : IServerListenScope, IDisposable
     /// <summary>Whether a server process this host started is running, ready or not.</summary>
     internal bool IsRunning => _process is { HasExited: false };
 
+    /// <summary>The server process this host started, while it runs, or null.</summary>
+    internal RunningServer? Running =>
+        _process is { HasExited: false } process && StartedAtUtc is { } started ? new RunningServer(process.Id, started) : null;
+
     /// <summary>Where the server is: being started, answering, or stopped with nothing about to bring it back.</summary>
     internal ServerPhase Phase => _phase;
 
@@ -435,8 +439,8 @@ sealed class ServerHost : IServerListenScope, IDisposable
             cancellationToken);
     }
 
-    // A server that is alive and has said it is busy before it can answer (saving a copy of the data before an update) is
-    // waited for, however long that takes within StartupNotes.LongestBusy; one that says nothing gets HealthTimeout.
+    // A server that is alive and keeps saying it is busy before it can answer (saving a copy of the data before an update) is
+    // waited for for as long as its note stays fresh (StartupNotes.ProgressFreshFor); one that says nothing gets HealthTimeout.
     private bool IsSavingBeforeUpdate(Process? process)
     {
         if (process is not { HasExited: false } || !StartupNotes.IsBusy(_runtimeHome, StartedAtUtc, DateTime.UtcNow))

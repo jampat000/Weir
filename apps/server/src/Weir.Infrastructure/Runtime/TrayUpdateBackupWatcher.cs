@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -11,6 +12,7 @@ using Weir.Infrastructure.Sqlite;
 namespace Weir.Infrastructure.Runtime;
 
 /// <summary>
+/// <para>
 /// Saves the copy of Weir's data that the tray asks for before it applies an update, while this server is still running: the
 /// tray writes <see cref="RequestFileName"/> in Weir's data folder, holding
 /// <c>{ "id": "…", "requested_at": "2026-10-10T08:30:00Z", "target_version": "1.0.0-rc.13" }</c>, and this answers in
@@ -19,11 +21,18 @@ namespace Weir.Infrastructure.Runtime;
 /// <c>"saved"</c> with the copy's <c>path</c>, or <c>"failed"</c> with a plain <c>reason</c>. A file, like the other hand-offs, so
 /// it needs no session and only a process that can write the data folder can ask. A request made more than <see cref="MaxAge"/>
 /// ago, or already answered, is deleted unanswered.
+/// </para>
+/// <para>
+/// While the watcher is listening it keeps <see cref="ReadyFileName"/> in the data folder, <c>{ "pid": …, "started_at": … }</c> for
+/// this process, and removes it when the server stops. It is how the tray tells a server that can take the request from one built
+/// before it existed, without waiting to find out: a marker that names the running server means the request will be heard.
+/// </para>
 /// </summary>
 public sealed class TrayUpdateBackupWatcher : BackgroundService
 {
     public const string RequestFileName = "update-backup-request.json";
     public const string ResultFileName = "update-backup-result.json";
+    public const string ReadyFileName = "update-backup-ready";
 
     public const string StartedState = "started";
     public const string SavedState = "saved";
@@ -57,13 +66,51 @@ public sealed class TrayUpdateBackupWatcher : BackgroundService
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         _watcher = TryWatch();
+        if (_watcher is not null)
+        {
+            WriteReadyMarker();
+        }
+
         return base.StartAsync(cancellationToken);
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        RemoveReadyMarker();
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public override void Dispose()
     {
+        RemoveReadyMarker();
         _watcher?.Dispose();
         base.Dispose();
+    }
+
+    private void WriteReadyMarker()
+    {
+        try
+        {
+            using var self = Process.GetCurrentProcess();
+            var text = JsonSerializer.Serialize(new { Pid = self.Id, StartedAt = self.StartTime.ToUniversalTime() }, Json);
+            AtomicFileWriter.Replace(_options.WeirHome, ReadyFileName, Encoding.UTF8.GetBytes(text));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            _logger.LogWarning(exception, "Weir could not say that it can save a copy of its data for the tray; the tray will leave the copy to the start after its update.");
+        }
+    }
+
+    private void RemoveReadyMarker()
+    {
+        try
+        {
+            File.Delete(Path.Join(_options.WeirHome, ReadyFileName));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // The tray tells a marker that names another process from one that names this one.
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -166,7 +213,7 @@ public sealed class TrayUpdateBackupWatcher : BackgroundService
 
     private async Task SaveAndReportAsync(Request request, CancellationToken stoppingToken)
     {
-        WriteResult(new Result(request.Id, StartedState, null, null));
+        await WriteResultAsync(new Result(request.Id, StartedState, null, null), stoppingToken).ConfigureAwait(false);
         Result result;
         try
         {
@@ -185,7 +232,7 @@ public sealed class TrayUpdateBackupWatcher : BackgroundService
             result = new Result(request.Id, FailedState, null, new PreUpdateBackupException().Reason);
         }
 
-        WriteResult(result);
+        await WriteResultAsync(result, stoppingToken).ConfigureAwait(false);
     }
 
     private PreUpdateBackupFile Save(string targetVersion)
@@ -200,16 +247,33 @@ public sealed class TrayUpdateBackupWatcher : BackgroundService
 
     private sealed record Result(string Id, string State, string? Path, string? Reason);
 
-    private void WriteResult(Result result)
+    /// <summary>How many times an answer is written before giving up, and the pause between tries.</summary>
+    private const int WriteAttempts = 10;
+
+    private static readonly TimeSpan WriteRetryPause = TimeSpan.FromMilliseconds(50);
+
+    // The tray reads the file while it waits, and renaming a new one over a file that is being opened can fail for a moment; an
+    // answer that never lands leaves the tray waiting for a copy that is already saved, so it is tried again.
+    private async Task WriteResultAsync(Result result, CancellationToken cancellationToken)
     {
-        try
+        var text = JsonSerializer.Serialize(new { result.Id, result.State, result.Path, result.Reason, WrittenAt = _time.GetUtcNow() }, Json);
+        for (var attempt = 1; ; attempt++)
         {
-            var text = JsonSerializer.Serialize(new { result.Id, result.State, result.Path, result.Reason, WrittenAt = _time.GetUtcNow() }, Json);
-            AtomicFileWriter.Replace(_options.WeirHome, ResultFileName, Encoding.UTF8.GetBytes(text));
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            _logger.LogWarning(exception, "Weir could not write its answer to the tray's update backup request.");
+            try
+            {
+                AtomicFileWriter.Replace(_options.WeirHome, ResultFileName, Encoding.UTF8.GetBytes(text));
+                return;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                if (attempt == WriteAttempts)
+                {
+                    _logger.LogWarning(exception, "Weir could not write its answer to the tray's update backup request.");
+                    return;
+                }
+            }
+
+            await Task.Delay(WriteRetryPause, cancellationToken).ConfigureAwait(false);
         }
     }
 

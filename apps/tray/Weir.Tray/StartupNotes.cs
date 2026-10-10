@@ -17,8 +17,11 @@ static class StartupNotes
     internal const string ProgressFileName = "startup-progress.txt";
     internal const string ErrorFileName = "startup-error.txt";
 
-    /// <summary>How long a server may keep saying it is busy before the tray stops believing it.</summary>
-    internal static readonly TimeSpan LongestBusy = TimeSpan.FromMinutes(30);
+    /// <summary>
+    /// How old the server's progress note may be and still be believed. The server touches it about every ten seconds while its
+    /// work runs, so a healthy copy of any length keeps the tray waiting and a hung one shows as a problem within this time.
+    /// </summary>
+    internal static readonly TimeSpan ProgressFreshFor = TimeSpan.FromMinutes(2);
 
     /// <summary>Why the server that began at <paramref name="serverStartedUtc"/> could not start, or null when it said nothing.</summary>
     internal static StartupError? ReadError(string runtimeHome, DateTime? serverStartedUtc)
@@ -37,10 +40,10 @@ static class StartupNotes
     internal static bool IsBusy(string runtimeHome, DateTime? serverStartedUtc, DateTime nowUtc)
     {
         var path = Path.Combine(runtimeHome, ProgressFileName);
-        return ReadFresh(path, serverStartedUtc) is not null && nowUtc - File.GetLastWriteTimeUtc(path) < LongestBusy;
+        return ReadFresh(path, serverStartedUtc) is not null && nowUtc - File.GetLastWriteTimeUtc(path) < ProgressFreshFor;
     }
 
-    // Written no earlier than the process began; a few seconds' slack covers a clock that reads the start a little late.
+    // Written no earlier than the process began: a file from an earlier process is never this one's.
     private static string? ReadFresh(string path, DateTime? serverStartedUtc)
     {
         try
@@ -49,7 +52,7 @@ static class StartupNotes
             {
                 return null;
             }
-            if (serverStartedUtc is { } started && File.GetLastWriteTimeUtc(path) < started - TimeSpan.FromSeconds(5))
+            if (serverStartedUtc is { } started && File.GetLastWriteTimeUtc(path) < started)
             {
                 return null;
             }

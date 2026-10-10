@@ -145,50 +145,36 @@ public sealed class PreUpdateBackupTests : IDisposable
     }
 
     [Fact]
-    public void A_copy_already_saved_for_this_revision_and_version_is_used_and_nothing_more_is_written()
+    public void A_copy_the_running_server_took_stays_beside_the_one_the_updating_start_takes_because_the_data_has_moved_on()
     {
         var database = OldDatabase();
-        var first = Backup(fromVersion: "1.2.2");
-        Upgrade(database, first);
-        database.ClearPool();
-        var before = Names(Folder);
-        var saved = PreUpdateBackup.Latest(BackupDir)!;
-
-        // The server that starts after the update finds the running server's copy, a minute later and not knowing the old version.
-        _time.Advance(TimeSpan.FromMinutes(1));
-        var secondLogger = new ListLogger<PreUpdateBackup>();
-        var second = new PreUpdateBackup(BackupDir, _home.Path, Version, _time, secondLogger);
-        var reopened = new SqliteDatabase(DatabasePath);
-        PreUpdateBackupFile again;
-        using (var connection = reopened.Open())
+        using var connection = database.Open();
+        var running = Backup(fromVersion: "1.2.2").Save(connection, "0036_drop_pruner_tables");
+        using (var write = connection.CreateCommand())
         {
-            again = second.Save(connection, "0036_drop_pruner_tables");
+            write.CommandText = "CREATE TABLE written_after_the_first_copy (id INTEGER)";
+            write.ExecuteNonQuery();
         }
 
-        reopened.ClearPool();
+        // The server that starts after the update, a minute later, not knowing the old version.
+        _time.Advance(TimeSpan.FromMinutes(1));
+        var starting = new PreUpdateBackup(BackupDir, _home.Path, Version, _time, new ListLogger<PreUpdateBackup>()).Save(connection, "0036_drop_pruner_tables");
 
-        Assert.Equal(saved, again);
-        Assert.Equal(before, Names(Folder));
-        Assert.Contains(secondLogger.Entries, entry => entry.Message.StartsWith("A copy of Weir's data from before this update is already saved", StringComparison.Ordinal));
+        Assert.NotEqual(running.DatabasePath, starting.DatabasePath);
+        Assert.True(File.Exists(running.DatabasePath));
+        Assert.True(File.Exists(starting.DatabasePath));
+        Assert.False(HasTable(running.DatabasePath, "written_after_the_first_copy"));
+        Assert.True(HasTable(starting.DatabasePath, "written_after_the_first_copy"));
+        database.ClearPool();
     }
 
-    [Fact]
-    public void A_saved_copy_that_no_longer_opens_at_its_revision_is_not_trusted_and_a_new_one_is_made()
+    private static bool HasTable(string path, string name)
     {
-        var database = OldDatabase();
-        Upgrade(database, Backup());
-        database.ClearPool();
-        var damaged = Path.Join(Folder, $"{Stem}.db");
-        File.WriteAllText(damaged, "not a database");
-
-        _time.Advance(TimeSpan.FromMinutes(1));
-        // The first database went to head with its upgrade; this one is another at the baseline.
-        var again = OldDatabase(_home.Join("again", "weir.sqlite3"));
-        Upgrade(again, Backup());
-        again.ClearPool();
-
-        Assert.Contains(Stamped(_time.GetUtcNow()) + ".db", Names(Folder));
-        Assert.Equal("0036_drop_pruner_tables", Revision(Path.Join(Folder, Stamped(_time.GetUtcNow()) + ".db")));
+        using var copy = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+        copy.Open();
+        using var read = copy.CreateCommand();
+        read.CommandText = $"SELECT COUNT(*) FROM sqlite_master WHERE name = '{name}'";
+        return Convert.ToInt64(read.ExecuteScalar(), CultureInfo.InvariantCulture) > 0;
     }
 
     [Fact]

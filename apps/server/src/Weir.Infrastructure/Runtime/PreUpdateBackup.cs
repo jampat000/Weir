@@ -54,9 +54,9 @@ public sealed class PreUpdateBackupException : Exception
 /// </summary>
 /// <remarks>
 /// <para>
-/// It is taken by the running server when the tray is about to apply an update (<see cref="TrayUpdateBackupWatcher"/>), and by the
-/// server that starts on an older database as the net under every other way an update arrives. The second finds the first's copy
-/// and leaves it as it is. Older copies are pruned to <see cref="MaxKept"/> - 1 before a new one is written, so there are never
+/// It is taken by the running server when the tray is about to apply an update (<see cref="TrayUpdateBackupWatcher"/>), and again by
+/// the server that starts on an older database, which is the net under every other way an update arrives and sees the data as the
+/// update leaves it: the first copy stays beside it as an extra. Older copies are pruned to <see cref="MaxKept"/> - 1 before a new one is written, so there are never
 /// more than <see cref="MaxKept"/> on disk, and only files this class names are ever touched.
 /// </para>
 /// <para>
@@ -149,9 +149,8 @@ public sealed class PreUpdateBackup
     }
 
     /// <summary>
-    /// Saves the copy and returns it. A copy already saved for this revision and version that still opens at that revision is
-    /// the answer, and nothing is written. Otherwise older copies are pruned, the room is checked, and the database, settings
-    /// and secrets are copied and the database copy is checked to open at <paramref name="fromRevision"/>. Throws
+    /// Saves the copy and returns it: older copies are pruned, the room is checked, and the database, settings and secrets are
+    /// copied and the database copy is checked to open at <paramref name="fromRevision"/>. Throws
     /// <see cref="PreUpdateBackupException"/> when any step fails (whatever it was), after removing what it had written.
     /// </summary>
     public PreUpdateBackupFile Save(SqliteConnection connection, string fromRevision)
@@ -179,13 +178,6 @@ public sealed class PreUpdateBackup
     {
         EnsureFolder(folder);
         var revision = RevisionNumber(fromRevision);
-        if (FindSaved(folder, revision, fromRevision) is { } saved)
-        {
-            _logger.LogInformation(
-                "A copy of Weir's data from before this update is already saved from={From} to={To} path={Path}", fromRevision, _version, saved.DatabasePath);
-            return saved;
-        }
-
         // The oldest copy goes first, so the folder never holds more than MaxKept, even for a moment.
         Prune(folder, MaxKept - 1);
         var databaseBytes = new FileInfo(connection.DataSource).Length;
@@ -244,28 +236,6 @@ public sealed class PreUpdateBackup
         written.Add(copy);
         File.Copy(source, copy);
         RestrictFile(copy);
-    }
-
-    /// <summary>The newest copy for this revision and version that still opens at the revision, or null.</summary>
-    private PreUpdateBackupFile? FindSaved(string folder, string revision, string fromRevision)
-    {
-        var candidates = Parts(folder)
-            .Where(file => file.Part.Kind == DatabaseKind && file.Part.Revision == revision && file.Part.Version == _version)
-            .OrderByDescending(file => file.Part.TakenAt);
-        foreach (var (path, part) in candidates)
-        {
-            try
-            {
-                VerifyDatabase(path, fromRevision);
-                return Describe(folder, part, path);
-            }
-            catch (Exception exception) when (exception is SqliteException or IOException)
-            {
-                _logger.LogWarning(exception, "A saved copy of Weir's data does not open at the revision it should, so a new one is made path={Path}", path);
-            }
-        }
-
-        return null;
     }
 
     /// <summary>Keeps the newest <paramref name="keep"/> copies; removes the rest, and any copy a crash left unfinished.</summary>

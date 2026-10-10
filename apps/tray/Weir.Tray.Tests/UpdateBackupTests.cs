@@ -14,10 +14,12 @@ public sealed class UpdateBackupTests : IDisposable
     private const string Target = "1.0.0-rc.13";
     private const string DiskFull = "Drive C: needs about 480 MB free to hold the copy and has 120 MB. Free up space there, then try again.";
 
+    private static readonly DateTime ServerStarted = new(2026, 10, 10, 8, 0, 0, DateTimeKind.Utc);
+
     private readonly TempDirectory _home = TempDirectory.AsWeirHome();
     private readonly DelayWatchingTimeProvider _clock = new();
     private readonly StandInServers _servers = new();
-    private bool _serverRuns = true;
+    private RunningServer? _server = new(4242, ServerStarted);
 
     public void Dispose()
     {
@@ -29,7 +31,9 @@ public sealed class UpdateBackupTests : IDisposable
 
     private string ResultPath => Path.Combine(_home.Path, UpdateBackupRequest.ResultFileName);
 
-    private UpdateBackupRequest Request() => new(_home.Path, _clock, () => _serverRuns);
+    private string ReadyPath => Path.Combine(_home.Path, UpdateBackupReady.FileName);
+
+    private UpdateBackupRequest Request() => new(_home.Path, _clock, () => _server);
 
     private string AskedId() => (string)JsonNode.Parse(File.ReadAllText(RequestPath))!["id"]!;
 
@@ -38,9 +42,16 @@ public sealed class UpdateBackupTests : IDisposable
             ResultPath,
             new JsonObject { ["id"] = id, ["state"] = state, ["reason"] = reason }.ToJsonString());
 
-    // The request is written and the tray is parked on its first look at the answer.
+    // What a server with the backup watcher writes when it starts listening.
+    private void ServerIsReady(int pid, DateTime startedUtc) =>
+        File.WriteAllText(
+            ReadyPath,
+            new JsonObject { ["pid"] = pid, ["started_at"] = startedUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture) }.ToJsonString());
+
+    // The server is ready to hear the request, and the tray has asked and is parked on its first look at the answer.
     private async Task<(Task<UpdateBackupAnswer> Answer, string Id)> AskAsync()
     {
+        ServerIsReady(_server!.Value.ProcessId, _server.Value.StartedUtc);
         var answer = Request().AskAsync(Target, CancellationToken.None);
         await _clock.NextDelay();
         return (answer, AskedId());
@@ -96,14 +107,48 @@ public sealed class UpdateBackupTests : IDisposable
     }
 
     [Fact(Timeout = 10_000)]
-    public async Task A_server_that_never_answers_is_an_older_build_and_the_request_is_taken_back()
+    public async Task A_server_that_said_it_can_answer_and_does_not_has_failed_and_the_request_is_taken_back()
     {
         var (answer, _) = await AskAsync();
 
         _clock.Advance(UpdateBackupRequest.HearingTime);
 
+        var result = await answer;
+        Assert.Equal(UpdateBackupOutcome.Failed, result.Outcome);
+        Assert.Contains("didn't answer the request", result.Reason, StringComparison.Ordinal);
+        Assert.False(File.Exists(RequestPath));
+    }
+
+    [Fact]
+    public async Task A_server_with_no_marker_is_an_older_build_and_is_not_waited_for()
+    {
+        var answer = Request().AskAsync(Target, CancellationToken.None);
+
+        // Completed with no look at the clock: the menu does not wait for a server that cannot answer.
+        Assert.True(answer.IsCompletedSuccessfully);
         Assert.Equal(new UpdateBackupAnswer(UpdateBackupOutcome.NotAnswered, null), await answer);
         Assert.False(File.Exists(RequestPath));
+    }
+
+    [Fact]
+    public async Task A_marker_left_by_another_server_is_not_this_ones()
+    {
+        ServerIsReady(_server!.Value.ProcessId + 1, ServerStarted);
+        Assert.Equal(UpdateBackupOutcome.NotAnswered, (await Request().AskAsync(Target, CancellationToken.None)).Outcome);
+
+        // The same id, reused by a process that started later.
+        ServerIsReady(_server.Value.ProcessId, ServerStarted - TimeSpan.FromHours(1));
+        Assert.Equal(UpdateBackupOutcome.NotAnswered, (await Request().AskAsync(Target, CancellationToken.None)).Outcome);
+        Assert.False(File.Exists(RequestPath));
+    }
+
+    [Fact]
+    public async Task With_no_server_running_there_is_no_one_to_ask()
+    {
+        ServerIsReady(4242, ServerStarted);
+        _server = null;
+
+        Assert.Equal(UpdateBackupOutcome.NotAnswered, (await Request().AskAsync(Target, CancellationToken.None)).Outcome);
     }
 
     [Fact(Timeout = 10_000)]
@@ -114,7 +159,7 @@ public sealed class UpdateBackupTests : IDisposable
         ServerWrites("an-earlier-request", "saved");
         _clock.Advance(UpdateBackupRequest.HearingTime);
 
-        Assert.Equal(UpdateBackupOutcome.NotAnswered, (await answer).Outcome);
+        Assert.Equal(UpdateBackupOutcome.Failed, (await answer).Outcome);
     }
 
     [Fact(Timeout = 10_000)]
@@ -123,7 +168,7 @@ public sealed class UpdateBackupTests : IDisposable
         var (answer, id) = await AskAsync();
 
         ServerWrites(id, "started");
-        _serverRuns = false;
+        _server = null;
         await StepAsync(answer);
 
         var result = await answer;
@@ -191,15 +236,30 @@ public sealed class UpdateBackupTests : IDisposable
         Assert.False(UpdateBackupHook.FailedFor(_home.Path, "1.0.0-rc.14"));
     }
 
-    [Fact]
-    public async Task A_data_folder_that_cannot_be_written_is_a_failed_copy_not_a_crash()
+    [Theory]
+    [InlineData(typeof(IOException))]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(UnauthorizedAccessException))]
+    [InlineData(typeof(NullReferenceException))]
+    public async Task Whatever_goes_wrong_in_asking_is_a_failed_copy_not_a_crash(Type thrown)
     {
         var told = new List<string>();
-        var hook = Hook((_, _) => throw new IOException("no"), told.Add);
+        var hook = Hook((_, _) => throw (Exception)Activator.CreateInstance(thrown, "raw text")!, told.Add);
 
         Assert.False(await hook.SaveBeforeApplyAsync(Target));
         Assert.Single(told);
         Assert.StartsWith("Weir couldn't ask itself to save the copy", told[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("raw text", told[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_message_that_cannot_be_shown_still_leaves_the_update_not_applied()
+    {
+        var hook = Hook(
+            (_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Failed, DiskFull)),
+            _ => throw new InvalidOperationException("the icon is gone"));
+
+        Assert.False(await hook.SaveBeforeApplyAsync(Target));
     }
 
     [Fact(Timeout = 60_000)]
@@ -225,6 +285,18 @@ public sealed class UpdateBackupTests : IDisposable
         var backup = Hook((_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Failed, DiskFull)));
 
         await new TrayShutdown(() => ServerProcessStop.StopAsync(server), update, backup).QuitAsync();
+
+        Assert.Empty(update.Applied);
+        Assert.True(server.HasExited);
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task Quitting_still_stops_the_server_when_asking_for_the_copy_throws()
+    {
+        var server = await _servers.StartAsync(ServerFolder());
+        var update = new FakeUpdateService().AlreadyDownloaded();
+
+        await new TrayShutdown(() => ServerProcessStop.StopAsync(server), update, new ThrowingBackup()).QuitAsync();
 
         Assert.Empty(update.Applied);
         Assert.True(server.HasExited);
@@ -272,6 +344,139 @@ public sealed class UpdateBackupTests : IDisposable
         Assert.False(asked);
     }
 
+    [Fact(Timeout = 10_000)]
+    public async Task Asks_that_overlap_make_one_attempt_and_the_others_return_at_once()
+    {
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var asked = 0;
+        var stopped = 0;
+        var update = new FakeUpdateService().AlreadyDownloaded();
+        var shutdown = new TrayShutdown(
+            () =>
+            {
+                Interlocked.Increment(ref stopped);
+                return Task.CompletedTask;
+            },
+            update,
+            new GatedBackup(() =>
+            {
+                Interlocked.Increment(ref asked);
+                return gate.Task;
+            }));
+
+        var first = shutdown.RestartToUpdateAsync();
+        // Idle install, a balloon click, the apply-now flag and Quit, all while the first waits for its copy.
+        var others = new[] { await shutdown.RestartToUpdateAsync(), await shutdown.RestartToUpdateAsync(), await shutdown.QuitAsync() };
+
+        Assert.Equal([false, false, false], others);
+        Assert.False(first.IsCompleted);
+        Assert.Equal(1, asked);
+
+        gate.SetResult(true);
+        Assert.True(await first);
+
+        Assert.Equal(1, asked);
+        Assert.Equal(1, stopped);
+        Assert.Equal([FakeUpdateService.AppliedAndRestarted], update.Applied);
+    }
+
+    [Fact(Timeout = 10_000)]
+    public async Task A_new_attempt_may_begin_once_the_one_before_it_has_ended_without_applying()
+    {
+        var asked = 0;
+        var update = new FakeUpdateService().AlreadyDownloaded();
+        var shutdown = new TrayShutdown(
+            () => Task.CompletedTask,
+            update,
+            new GatedBackup(() =>
+            {
+                asked++;
+                return Task.FromResult(false);
+            }));
+
+        Assert.True(await shutdown.RestartToUpdateAsync());
+        Assert.True(await shutdown.RestartToUpdateAsync());
+
+        Assert.Equal(2, asked);
+        Assert.Empty(update.Applied);
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task Every_apply_now_flag_is_an_attempt_even_after_one_that_did_not_apply()
+    {
+        var service = new FakeUpdateService().AlreadyDownloaded();
+        var attempts = new SemaphoreSlim(0);
+        var updates = new TrayUpdates(
+            service,
+            _home.Path,
+            new UpdateSettings { CheckOnStartup = false, CheckIntervalMinutes = 0 },
+            new UpdateCallbacks(OnUi: action => action(), Changed: () => { }, Announce: _ => { }, ApplyNow: () => attempts.Release()),
+            _clock,
+            CancellationToken.None);
+        var flag = Path.Combine(_home.Path, "update-apply-now");
+        updates.Start();
+        await _clock.NextDelay();
+
+        await FlagAndWaitAsync(flag, 1, attempts);
+        await FlagAndWaitAsync(flag, 2, attempts);
+    }
+
+    private async Task FlagAndWaitAsync(string flag, int nth, SemaphoreSlim attempts)
+    {
+        File.WriteAllText(flag, "apply");
+        File.SetLastWriteTimeUtc(flag, new DateTime(2026, 10, 10, 8, 0, nth, DateTimeKind.Utc));
+        _clock.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.True(await attempts.WaitAsync(TimeSpan.FromSeconds(10)), $"The apply-now flag number {nth} was not acted on.");
+        await Eventually(() => !File.Exists(flag));
+    }
+
+    private static async Task Eventually(Func<bool> condition)
+    {
+        using var ceiling = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (!condition())
+        {
+            await Task.Yield();
+            ceiling.Token.ThrowIfCancellationRequested();
+        }
+    }
+
+    [Fact]
+    public async Task The_message_of_a_quit_that_could_not_apply_the_update_is_still_there_at_the_next_start()
+    {
+        var failing = Hook((_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Failed, DiskFull)));
+        await failing.SaveBeforeApplyAsync(Target);
+
+        // A tray starting again, and again, running the version the update was meant to replace.
+        Assert.Equal(DiskFull, UpdateBackupHook.PendingReason(_home.Path, "1.0.0-rc.12"));
+        Assert.Equal(DiskFull, UpdateBackupHook.PendingReason(_home.Path, "1.0.0-rc.12"));
+
+        var held = JsonNode.Parse(File.ReadAllText(Path.Combine(_home.Path, "update-not-applied.json")))!;
+        Assert.Equal(DiskFull, (string?)held["reason"]);
+        Assert.Equal(Target, (string?)held["version"]);
+    }
+
+    [Fact]
+    public async Task The_message_goes_when_a_copy_is_saved()
+    {
+        await Hook((_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Failed, DiskFull))).SaveBeforeApplyAsync(Target);
+
+        await Hook((_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Saved, null))).SaveBeforeApplyAsync(Target);
+
+        Assert.Null(UpdateBackupHook.PendingReason(_home.Path, "1.0.0-rc.12"));
+        Assert.False(File.Exists(Path.Combine(_home.Path, "update-not-applied.json")));
+    }
+
+    [Fact]
+    public async Task The_message_goes_when_the_update_it_is_about_has_been_installed_some_other_way()
+    {
+        await Hook((_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Failed, DiskFull))).SaveBeforeApplyAsync(Target);
+
+        Assert.Null(UpdateBackupHook.PendingReason(_home.Path, Target));
+        Assert.False(File.Exists(Path.Combine(_home.Path, "update-not-applied.json")));
+        Assert.False(UpdateBackupHook.FailedFor(_home.Path, Target));
+    }
+
     [Fact]
     public void An_update_whose_copy_failed_is_not_applied_at_start_up_where_no_server_runs_to_ask()
     {
@@ -295,26 +500,82 @@ public sealed class UpdateBackupTests : IDisposable
     }
 
     [Fact]
-    public async Task The_reason_is_kept_for_System_About_until_a_copy_is_saved_or_the_tray_starts_again()
+    public void A_server_left_running_is_asked_for_the_copy_before_it_is_stopped_and_the_update_applied()
     {
-        var reasonPath = Path.Combine(_home.Path, "update-not-applied.json");
-        var failing = Hook((_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Failed, DiskFull)));
+        var order = new List<string>();
+        var service = new FakeUpdateService { LeftWaitingVersion = "3.3.0" };
+        service.OnApply = call => order.Add(call);
+        var backup = new GatedBackup(() =>
+        {
+            order.Add("copy asked");
+            return Task.FromResult(true);
+        });
 
-        await failing.SaveBeforeApplyAsync(Target);
+        var handedOver = UpdateOnStart.TryApply(service, UpdateMode.Auto, _home.Path, () => order.Add("orphan stopped"), backup, () => true);
 
-        var held = JsonNode.Parse(await File.ReadAllTextAsync(reasonPath))!;
-        Assert.Equal(DiskFull, (string?)held["reason"]);
-        Assert.Equal(Target, (string?)held["version"]);
+        Assert.True(handedOver);
+        Assert.Equal(["copy asked", "orphan stopped", FakeUpdateService.AppliedLeftWaiting], order);
+    }
 
-        // A tray that starts has applied nothing yet.
-        UpdateBackupHook.ForgetReason(_home.Path);
-        Assert.False(File.Exists(reasonPath));
+    [Fact]
+    public void A_server_left_running_that_cannot_save_the_copy_keeps_the_update_waiting_and_is_not_stopped()
+    {
+        var stopped = false;
+        var service = new FakeUpdateService { LeftWaitingVersion = "3.3.0" };
 
-        await failing.SaveBeforeApplyAsync(Target);
-        Assert.True(File.Exists(reasonPath));
+        var handedOver = UpdateOnStart.TryApply(
+            service, UpdateMode.Auto, _home.Path, () => stopped = true, new GatedBackup(() => Task.FromResult(false)), () => true);
 
-        await Hook((_, _) => Task.FromResult(new UpdateBackupAnswer(UpdateBackupOutcome.Saved, null))).SaveBeforeApplyAsync(Target);
-        Assert.False(File.Exists(reasonPath));
+        Assert.False(handedOver);
+        Assert.Empty(service.Applied);
+        Assert.False(stopped);
+        // Not used up: the next start asks again.
+        Assert.False(File.Exists(Path.Combine(_home.Path, UpdateOnStart.AttemptFileName)));
+    }
+
+    [Fact]
+    public void A_server_left_running_is_asked_again_even_when_an_earlier_copy_failed()
+    {
+        File.WriteAllText(Path.Combine(_home.Path, "update-backup-failed"), "3.3.0");
+        var asked = false;
+        var service = new FakeUpdateService { LeftWaitingVersion = "3.3.0" };
+
+        var handedOver = UpdateOnStart.TryApply(
+            service,
+            UpdateMode.Auto,
+            _home.Path,
+            () => { },
+            new GatedBackup(() =>
+            {
+                asked = true;
+                return Task.FromResult(true);
+            }),
+            () => true);
+
+        Assert.True(asked);
+        Assert.True(handedOver);
+    }
+
+    [Fact]
+    public void With_no_server_left_running_the_start_up_install_asks_nothing()
+    {
+        var asked = false;
+        var service = new FakeUpdateService { LeftWaitingVersion = "3.3.0" };
+
+        var handedOver = UpdateOnStart.TryApply(
+            service,
+            UpdateMode.Auto,
+            _home.Path,
+            () => { },
+            new GatedBackup(() =>
+            {
+                asked = true;
+                return Task.FromResult(false);
+            }),
+            () => false);
+
+        Assert.True(handedOver);
+        Assert.False(asked);
     }
 
     private UpdateBackupHook Hook(
@@ -322,4 +583,14 @@ public sealed class UpdateBackupTests : IDisposable
         new(ask, _home.Path, () => running, onNotUpdated ?? (_ => { }));
 
     private string ServerFolder() => Path.Combine(_home.Path, "server-" + Guid.NewGuid().ToString("n"));
+
+    private sealed class GatedBackup(Func<Task<bool>> save) : IUpdateBackup
+    {
+        public Task<bool> SaveBeforeApplyAsync(string? targetVersion) => save();
+    }
+
+    private sealed class ThrowingBackup : IUpdateBackup
+    {
+        public Task<bool> SaveBeforeApplyAsync(string? targetVersion) => throw new InvalidOperationException("raw text");
+    }
 }

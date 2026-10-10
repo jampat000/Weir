@@ -196,13 +196,15 @@ public static class WeirServer
     {
         var database = app.Services.GetRequiredService<SqliteDatabase>();
         StartupNotes.ClearStale(options.WeirHome);
+        var time = app.Services.GetRequiredService<TimeProvider>();
+        IDisposable? progress = null;
         var backup = new PreUpdateBackup(
             options.BackupDir,
             options.WeirHome,
             WeirVersion.Resolve(options.VersionOverride),
-            app.Services.GetRequiredService<TimeProvider>(),
+            time,
             logger,
-            saving: sentence => StartupNotes.WriteProgress(options.WeirHome, sentence));
+            saving: sentence => progress = StartupNotes.BeginProgress(options.WeirHome, sentence, time));
         SchemaStartupOutcome outcome;
         try
         {
@@ -221,7 +223,7 @@ public static class WeirServer
         }
         finally
         {
-            StartupNotes.ClearProgress(options.WeirHome);
+            progress?.Dispose();
         }
 
         if (outcome == SchemaStartupOutcome.Created)

@@ -119,29 +119,38 @@ sealed class TrayUpdates
         }
     }
 
-    // The server's Settings page asks for "update now" by creating this flag file.
+    // The server's Settings page asks for "update now" by creating this flag file. Every flag is an attempt, and the watch goes on
+    // after one: an attempt that does not apply the update (its copy of the data could not be saved) leaves this tray running, and
+    // the next flag is the next attempt.
     private async Task WatchForApplyNowAsync(CancellationToken cancellationToken)
     {
         var flagPath = Path.Combine(_runtimeHome, ApplyNowFlagFileName);
-        using var timer = new PeriodicTimer(ApplyNowPollInterval);
+        using var timer = new PeriodicTimer(ApplyNowPollInterval, _clock);
+        var answered = DateTime.MinValue;
         while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
         {
             if (!File.Exists(flagPath) || !_service.IsDownloaded)
             {
                 continue;
             }
+            // A flag that cannot be deleted is answered once, not on every look.
+            var written = File.GetLastWriteTimeUtc(flagPath);
+            if (written == answered)
+            {
+                continue;
+            }
+            answered = written;
             try
             {
                 File.Delete(flagPath);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Applying anyway is right: the flag asked for it, and the restart replaces this process.
+                // Applying anyway is right: the flag asked for it.
                 TrayLog.Write($"Could not delete {flagPath}: {ex.Message}");
             }
             TrayLog.Write("Apply-now flag detected - applying update and restarting.");
             _callbacks.OnUi(_callbacks.ApplyNow);
-            return;
         }
     }
 

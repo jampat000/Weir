@@ -73,7 +73,7 @@ sealed class TrayApp : IDisposable
             StopServerAsync,
             updateService,
             new UpdateBackupHook(
-                new UpdateBackupRequest(_runtimeHome, TimeProvider.System, () => _server.IsRunning).AskAsync,
+                new UpdateBackupRequest(_runtimeHome, TimeProvider.System, () => _server.Running).AskAsync,
                 _runtimeHome,
                 () => _server.IsRunning,
                 reason => OnUi(() => ShowNotUpdated(reason))));
@@ -108,7 +108,6 @@ sealed class TrayApp : IDisposable
         }
         _ui = SynchronizationContext.Current;
 
-        UpdateBackupHook.ForgetReason(_runtimeHome);
         _server.PrepareEnvironment();
         _server.WritePortFile();
         TrayLog.Write($"Prepared runtime environment on port {_server.Port}");
@@ -167,6 +166,12 @@ sealed class TrayApp : IDisposable
         else
         {
             TrayLog.Write("Skipping the start balloon (no-browser mode).");
+        }
+
+        // An update an earlier run could not apply, for want of a copy of the data, is still waiting: say so now the icon is up.
+        if (UpdateBackupHook.PendingReason(_runtimeHome, AppVersion.Current) is { } notUpdated)
+        {
+            ShowNotUpdated(notUpdated);
         }
 
         BeginWatching();
@@ -338,7 +343,10 @@ sealed class TrayApp : IDisposable
             return;
         }
         TrayLog.Write("Applying the downloaded update and restarting.");
-        await _shutdown.RestartToUpdateAsync();
+        if (!await _shutdown.RestartToUpdateAsync())
+        {
+            ShowBalloon("Weir Update", TrayBalloons.UpdateUnderWayText, ToolTipIcon.Info);
+        }
     }
 
     // The update stays downloaded and the old version keeps running; the next scheduled check, or a click, tries again.
@@ -460,7 +468,11 @@ sealed class TrayApp : IDisposable
     private async Task QuitAsync()
     {
         TrayLog.Write("Quit requested from tray icon");
-        await _shutdown.QuitAsync();
+        if (!await _shutdown.QuitAsync())
+        {
+            // An update is being applied, and ends this process by itself.
+            return;
+        }
         Application.Exit();
     }
 

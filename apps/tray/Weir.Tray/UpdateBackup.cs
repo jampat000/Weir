@@ -1,10 +1,12 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Weir.Tray;
 
 /// <summary>
 /// The tray's way to have a copy of Weir's data saved before it applies an update. Every path that applies one asks first
-/// (<see cref="TrayShutdown"/>), and none applies it when the copy could not be saved.
+/// (<see cref="TrayShutdown"/>, and the install at start-up), and none applies it when the copy could not be saved.
 /// </summary>
 interface IUpdateBackup
 {
@@ -12,6 +14,7 @@ interface IUpdateBackup
     /// Has the running server save a copy of Weir's data before the update to <paramref name="targetVersion"/> is applied. True
     /// when the update may go ahead: the copy is saved, or the server is too old to make one and the server that starts after the
     /// update will. False when the copy could not be saved: the person has been told why, and the update must not be applied.
+    /// Never throws.
     /// </summary>
     Task<bool> SaveBeforeApplyAsync(string? targetVersion);
 }
@@ -22,26 +25,88 @@ enum UpdateBackupOutcome
     /// <summary>The copy is saved.</summary>
     Saved,
 
-    /// <summary>The copy could not be saved; <see cref="UpdateBackupAnswer.Reason"/> says why.</summary>
+    /// <summary>The copy could not be saved, or the server that can save one did not; <see cref="UpdateBackupAnswer.Reason"/> says why.</summary>
     Failed,
 
-    /// <summary>The server never answered: a build from before it could (or none is running). The server that starts after the update saves the copy.</summary>
+    /// <summary>No server that can save a copy is running: none, or a build from before it could. The server that starts after the update saves the copy.</summary>
     NotAnswered,
 }
 
 /// <param name="Outcome">How the request ended.</param>
-/// <param name="Reason">Why the copy could not be saved, in the server's plain words, when <paramref name="Outcome"/> is Failed.</param>
+/// <param name="Reason">Why the copy could not be saved, in plain words, when <paramref name="Outcome"/> is Failed.</param>
 readonly record struct UpdateBackupAnswer(UpdateBackupOutcome Outcome, string? Reason);
+
+/// <summary>A server process: its id and when it began, which together tell it from any other that reuses the id.</summary>
+readonly record struct RunningServer(int ProcessId, DateTime StartedUtc)
+{
+    /// <summary>The two clocks that read a start time (the server's, the tray's) can differ by a little.</summary>
+    private static readonly TimeSpan StartTimeSlack = TimeSpan.FromSeconds(2);
+
+    internal bool IsSameProcessAs(RunningServer other) =>
+        ProcessId == other.ProcessId && (StartedUtc - other.StartedUtc).Duration() <= StartTimeSlack;
+}
+
+/// <summary>
+/// <c>update-backup-ready</c> in the runtime home: <c>{ "pid": …, "started_at": … }</c>, which a server whose backup watcher is
+/// listening writes (<c>TrayUpdateBackupWatcher</c> in the server) and removes when it stops. A marker that names the running
+/// server is how the tray knows a request will be heard; no marker means a build from before the request existed.
+/// </summary>
+static class UpdateBackupReady
+{
+    internal const string FileName = "update-backup-ready";
+
+    private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+
+    internal static RunningServer? Read(string runtimeHome)
+    {
+        try
+        {
+            var wire = JsonSerializer.Deserialize<Wire>(File.ReadAllText(Path.Combine(runtimeHome, FileName)), Json);
+            return wire is { Pid: { } pid, StartedAt: { } startedAt } ? new RunningServer(pid, startedAt.UtcDateTime) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The server named by the marker, if that process is still running (a server left behind by a tray that was killed, say),
+    /// or null: no marker, a process that has gone, or one that only reuses its id.
+    /// </summary>
+    internal static RunningServer? FindLiveServer(string runtimeHome)
+    {
+        if (Read(runtimeHome) is not { } marked)
+        {
+            return null;
+        }
+        try
+        {
+            using var process = Process.GetProcessById(marked.ProcessId);
+            var live = new RunningServer(process.Id, process.StartTime.ToUniversalTime());
+            return !process.HasExited && live.IsSameProcessAs(marked) ? live : null;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    private sealed record Wire(int? Pid, DateTimeOffset? StartedAt);
+}
 
 /// <summary>
 /// Asks the running server for a copy of Weir's data through two files in the runtime home, as Pause does
 /// (<c>PauseRequestFile</c>): <c>update-backup-request.json</c> is the tray's request and <c>update-backup-result.json</c> the
 /// server's answer, first <c>started</c> (it heard, and is saving), then <c>saved</c> or <c>failed</c> with a plain reason. Files,
 /// not a route, because the tray has no signed-in session, nothing is added to the server's public surface, and only a process
-/// that can write the runtime home (readable by the account running Weir alone) can ask. A server that never writes
-/// <c>started</c> does not know the request, and that is not a failure.
+/// that can write the runtime home (readable by the account running Weir alone) can ask. It asks only a server that has said it can
+/// answer (<see cref="UpdateBackupReady"/>), and one that has said so and then does not answer has failed.
 /// </summary>
-sealed class UpdateBackupRequest(string runtimeHome, TimeProvider clock, Func<bool> serverIsRunning)
+/// <param name="runtimeHome">The data folder.</param>
+/// <param name="clock">Times the wait.</param>
+/// <param name="server">The server process to ask, or null when none runs.</param>
+sealed class UpdateBackupRequest(string runtimeHome, TimeProvider clock, Func<RunningServer?> server)
 {
     internal const string RequestFileName = "update-backup-request.json";
     internal const string ResultFileName = "update-backup-result.json";
@@ -50,7 +115,7 @@ sealed class UpdateBackupRequest(string runtimeHome, TimeProvider clock, Func<bo
     private const string SavedState = "saved";
     private const string FailedState = "failed";
 
-    /// <summary>How long the server has to say it heard the request. It answers within a second when it can.</summary>
+    /// <summary>How long a server that has said it can answer has to say it heard the request. It answers within a second.</summary>
     internal static readonly TimeSpan HearingTime = TimeSpan.FromSeconds(15);
 
     /// <summary>The longest a copy may take once the server has said it is saving.</summary>
@@ -63,6 +128,13 @@ sealed class UpdateBackupRequest(string runtimeHome, TimeProvider clock, Func<bo
 
     internal async Task<UpdateBackupAnswer> AskAsync(string targetVersion, CancellationToken cancellationToken)
     {
+        if (server() is not { } running
+            || UpdateBackupReady.Read(runtimeHome) is not { } ready
+            || !ready.IsSameProcessAs(running))
+        {
+            return new UpdateBackupAnswer(UpdateBackupOutcome.NotAnswered, null);
+        }
+
         var id = Guid.NewGuid().ToString("n");
         var asked = clock.GetTimestamp();
         Remove(ResultFileName);
@@ -89,15 +161,15 @@ sealed class UpdateBackupRequest(string runtimeHome, TimeProvider clock, Func<bo
             }
 
             var waited = clock.GetElapsedTime(asked);
-            if (!heard && waited >= HearingTime)
-            {
-                // Taken back, so a server that wakes up later does not save a copy for an update the tray went ahead with.
-                Remove(RequestFileName);
-                return new UpdateBackupAnswer(UpdateBackupOutcome.NotAnswered, null);
-            }
-            if (heard && !serverIsRunning())
+            if (server() is not { } now || !now.IsSameProcessAs(running))
             {
                 return Failed("Weir stopped while it was saving the copy. Start Weir again, then try again.");
+            }
+            if (!heard && waited >= HearingTime)
+            {
+                // Taken back, so a server that wakes up later does not save a copy for an update the tray did not go ahead with.
+                Remove(RequestFileName);
+                return Failed("Weir didn't answer the request to save a copy of its data. Try again in a moment; if it keeps happening, restart Weir.");
             }
             if (heard && waited >= LongestSave)
             {
@@ -146,7 +218,8 @@ sealed class UpdateBackupRequest(string runtimeHome, TimeProvider clock, Func<bo
 
 /// <summary>
 /// The hook the apply paths call: asks the running server for the copy, and when it cannot be saved says so (the log, a message
-/// for the person, and a record that keeps the next start from applying the update by itself). It decides nothing else.
+/// for the person, and a record that keeps the next start from applying the update by itself). It decides nothing else, and
+/// nothing it does can throw, so a path that stops the server afterwards always reaches that step.
 /// </summary>
 /// <param name="ask">Asks the running server (<see cref="UpdateBackupRequest.AskAsync"/>).</param>
 /// <param name="runtimeHome">Where the record of a failed copy is kept.</param>
@@ -171,6 +244,21 @@ sealed class UpdateBackupHook(
 
     public async Task<bool> SaveBeforeApplyAsync(string? targetVersion)
     {
+        try
+        {
+            return await SaveAsync(targetVersion).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Whatever goes wrong here is a copy that was not saved; the caller must still be able to stop the server.
+        catch (Exception ex) when (ex is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            TrayLog.Write($"Could not make sure a copy of Weir's data was saved first, so the update is not applied:\n{ex}");
+            return false;
+        }
+    }
+
+    private async Task<bool> SaveAsync(string? targetVersion)
+    {
         if (!serverIsRunning())
         {
             TrayLog.Write("No server is running to save a copy of Weir's data first; the server that starts after the update will.");
@@ -184,12 +272,14 @@ sealed class UpdateBackupHook(
         {
             answer = await ask(version, CancellationToken.None).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+#pragma warning disable CA1031 // A request that could not be made is a copy that was not saved.
+        catch (Exception ex) when (ex is not OperationCanceledException)
+#pragma warning restore CA1031
         {
-            TrayLog.Write($"Could not ask the server to save a copy of Weir's data: {ex.Message}");
+            TrayLog.Write($"Could not ask the server to save a copy of Weir's data:\n{ex}");
             answer = new UpdateBackupAnswer(
                 UpdateBackupOutcome.Failed,
-                "Weir couldn't ask itself to save the copy because its data folder can't be written to. Check that the account Weir runs as can write to it, then try again.");
+                "Weir couldn't ask itself to save the copy. Check that the account Weir runs as can write to its data folder, then try again.");
         }
 
         switch (answer.Outcome)
@@ -199,7 +289,7 @@ sealed class UpdateBackupHook(
                 Forget();
                 return true;
             case UpdateBackupOutcome.NotAnswered:
-                TrayLog.Write("The server did not answer the request for a copy of Weir's data, so it is an older build; the server that starts after the update will save it.");
+                TrayLog.Write("No server that can save a copy of Weir's data is running (an older build); the server that starts after the update will save it.");
                 return true;
             default:
                 var reason = answer.Reason ?? "Something unexpected went wrong. The details are in Weir's log files.";
@@ -227,10 +317,39 @@ sealed class UpdateBackupHook(
     }
 
     /// <summary>
-    /// Removes the reason the last update was held back. A tray that starts has applied nothing yet, so a reason from the run
-    /// before it is no longer the case; the record that keeps the start-up install away stays until a copy is saved.
+    /// Why an update was held back and not applied since, or null. It stays until a copy is saved, so a tray that starts again
+    /// (a quit that could not apply the update) still says so. A reason for the version that is now running is no longer the case,
+    /// and is removed.
     /// </summary>
-    internal static void ForgetReason(string runtimeHome) => Delete(runtimeHome, NotAppliedFileName);
+    internal static string? PendingReason(string runtimeHome, string runningVersion)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(runtimeHome, NotAppliedFileName)));
+            var root = document.RootElement;
+            var reason = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String
+                ? r.GetString()
+                : null;
+            var version = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.String
+                ? v.GetString()
+                : null;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return null;
+            }
+            if (AppVersion.Without(version) == runningVersion)
+            {
+                Delete(runtimeHome, NotAppliedFileName);
+                Delete(runtimeHome, FailedMarkerFileName);
+                return null;
+            }
+            return reason;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
 
     private void Remember(string version, string reason)
     {

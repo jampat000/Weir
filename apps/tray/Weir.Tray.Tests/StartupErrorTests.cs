@@ -15,7 +15,8 @@ public sealed class StartupErrorTests : IDisposable
         "Weir couldn't save a copy of its data before updating, so it didn't change anything: Drive C: needs about 480 MB free to hold the copy and has 120 MB. Free up space there, then try again.";
 
     private readonly TempDirectory _home = TempDirectory.AsWeirHome();
-    private readonly DateTime _serverStarted = DateTime.UtcNow;
+    // Well before the notes the tests write: the file system stamps files with a coarser clock than DateTime.UtcNow reads.
+    private readonly DateTime _serverStarted = DateTime.UtcNow - TimeSpan.FromMinutes(1);
 
     public void Dispose() => _home.Dispose();
 
@@ -67,7 +68,46 @@ public sealed class StartupErrorTests : IDisposable
         File.WriteAllText(ProgressPath, "Saving a copy of Weir's data (480 MB) before updating…");
 
         Assert.True(StartupNotes.IsBusy(_home.Path, _serverStarted, now));
-        Assert.False(StartupNotes.IsBusy(_home.Path, _serverStarted, now + StartupNotes.LongestBusy + TimeSpan.FromSeconds(1)));
+        Assert.False(StartupNotes.IsBusy(_home.Path, _serverStarted, now + StartupNotes.ProgressFreshFor + TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
+    public void A_copy_that_goes_on_for_hours_keeps_the_tray_waiting_while_its_note_is_touched()
+    {
+        File.WriteAllText(ProgressPath, "Saving a copy");
+        var now = _serverStarted + TimeSpan.FromHours(3);
+
+        // The server touches the note about every ten seconds; each look finds it a few seconds old.
+        File.SetLastWriteTimeUtc(ProgressPath, now - TimeSpan.FromSeconds(10));
+
+        Assert.True(StartupNotes.IsBusy(_home.Path, _serverStarted, now));
+    }
+
+    [Fact]
+    public void A_hung_copy_whose_note_has_gone_quiet_shows_as_a_problem_within_a_couple_of_minutes()
+    {
+        File.WriteAllText(ProgressPath, "Saving a copy");
+        var now = _serverStarted + TimeSpan.FromMinutes(20);
+        File.SetLastWriteTimeUtc(ProgressPath, now - TimeSpan.FromMinutes(3));
+
+        Assert.False(StartupNotes.IsBusy(_home.Path, _serverStarted, now));
+        Assert.True(StartupNotes.ProgressFreshFor <= TimeSpan.FromMinutes(2));
+    }
+
+    [Fact]
+    public void A_note_written_the_instant_before_the_server_began_is_the_last_ones_not_this_ones()
+    {
+        File.WriteAllText(ErrorPath, $"{Headline}\n{Sentence}");
+        File.SetLastWriteTimeUtc(ErrorPath, _serverStarted - TimeSpan.FromMilliseconds(1));
+        File.WriteAllText(ProgressPath, "busy");
+        File.SetLastWriteTimeUtc(ProgressPath, _serverStarted - TimeSpan.FromMilliseconds(1));
+
+        Assert.Null(StartupNotes.ReadError(_home.Path, _serverStarted));
+        Assert.False(StartupNotes.IsBusy(_home.Path, _serverStarted, _serverStarted));
+
+        File.SetLastWriteTimeUtc(ErrorPath, _serverStarted);
+
+        Assert.NotNull(StartupNotes.ReadError(_home.Path, _serverStarted));
     }
 
     [Fact]
