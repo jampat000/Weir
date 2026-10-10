@@ -330,10 +330,26 @@ public static class UpdateStatus
             new WireObject().Set("busy", busy).Set("checkedAt", checkedAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)),
             WireJsonFormat.Compact);
 
-    /// <summary>Reads the tray's update state file: whether an update is downloaded and its version, with a not-downloaded fallback.</summary>
+    /// <summary>
+    /// What the tray is doing about updates: <c>idle</c> (an update it found and did not download is named in
+    /// <c>pending_version</c>), <c>checking</c>, <c>downloading</c>, <c>downloaded</c> (waiting to be applied) or <c>failed</c>.
+    /// </summary>
+    public const string StateIdle = "idle";
+    public const string StateChecking = "checking";
+    public const string StateDownloading = "downloading";
+    public const string StateDownloaded = "downloaded";
+    public const string StateFailed = "failed";
+
+    private static readonly IReadOnlyList<string> ActiveOrFailedStates = [StateChecking, StateDownloading, StateFailed];
+
+    /// <summary>
+    /// Reads the tray's update state file: where the tray is with an update, the version it found or downloaded and, after a
+    /// failure, why. A file that cannot be read says nothing is happening. <c>downloaded</c> settles whether the update is
+    /// downloaded; the named state can only add what the tray is doing otherwise.
+    /// </summary>
     public static WireObject ParseUpdateState(string? text)
     {
-        var fallback = new WireObject().Set("downloaded", false).Set("pending_version", (string?)null);
+        var fallback = StateOut(false, null, StateIdle, null);
         if (text is null)
         {
             return fallback;
@@ -358,15 +374,33 @@ public static class UpdateStatus
                 pending = s.Value;
             }
 
-            return new WireObject()
-                .Set("downloaded", (dict.Get("downloaded") ?? WireBool.False).IsTruthy)
-                .Set("pending_version", pending);
+            var downloaded = (dict.Get("downloaded") ?? WireBool.False).IsTruthy;
+            var state = dict.Get("state") is WireString named && ActiveOrFailedStates.Contains(named.Value, StringComparer.Ordinal) ? named.Value : StateIdle;
+            var failure = state == StateFailed && dict.Get("failure") is WireString { Value.Length: > 0 } reason ? reason.Value : null;
+            return StateOut(downloaded, pending, downloaded ? StateDownloaded : state, failure);
         }
         catch (WireJsonDecodeException)
         {
             return fallback;
         }
     }
+
+    /// <summary>
+    /// <paramref name="state"/> as read, but saying the tray is at <paramref name="step"/>: <see cref="StateChecking"/> or
+    /// <see cref="StateDownloading"/> when a person has asked for it and the tray has not yet taken it up, or
+    /// <see cref="StateIdle"/> when the tray that said it was at one has gone.
+    /// </summary>
+    public static WireObject WithStep(WireObject state, string step)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return StateOut(false, state.Get("pending_version") is WireString { Value.Length: > 0 } version ? version.Value : null, step, null);
+    }
+
+    private static WireObject StateOut(bool downloaded, string? pendingVersion, string state, string? failure) => new WireObject()
+        .Set("downloaded", downloaded)
+        .Set("pending_version", pendingVersion)
+        .Set("state", state)
+        .Set("failure", failure);
 
     private static WireObject Base(string currentVersion, string installType, string status, string summary) => new WireObject()
         .Set("current_version", currentVersion)

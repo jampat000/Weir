@@ -51,17 +51,50 @@ public sealed class PortDialogTests
     }
 
     [Fact]
-    public void Once_shown_the_first_run_window_is_top_most_as_Windows_sees_it()
+    public void A_question_that_must_be_seen_asks_Windows_for_a_top_most_window_before_it_is_shown()
+    {
+        // What Windows grants is its own decision; what Weir controls is what it asks for.
+        const int topMostStyle = 0x00000008;
+        OnSta(() =>
+        {
+            foreach (var reason in new[] { PortPromptReason.FirstRun, PortPromptReason.SavedPortBusy })
+            {
+                using var startUp = new PortDialog(new PortPrompt(reason, 9347, false, 9347), Busy(), null);
+
+                Assert.False(startUp.IsHandleCreated, reason.ToString());
+                Assert.True(startUp.TopMost, reason.ToString());
+                Assert.NotEqual(0, startUp.RequestedExtendedStyle & topMostStyle);
+            }
+
+            using var menu = new PortDialog(new PortPrompt(PortPromptReason.Change, 9347, false, 9347), Busy(), null);
+
+            Assert.False(menu.TopMost);
+            Assert.Equal(0, menu.RequestedExtendedStyle & topMostStyle);
+        });
+    }
+
+    [Fact]
+    public void A_question_that_must_be_seen_is_brought_to_the_front_when_it_is_shown_and_the_one_from_the_menu_is_not()
     {
         OnSta(() =>
         {
-            using var dialog = new PortDialog(new PortPrompt(PortPromptReason.FirstRun, 9347, false, 9347), Busy(), null);
+            var windows = new RecordingWindows();
+            using var startUp = new PortDialog(new PortPrompt(PortPromptReason.FirstRun, 9347, false, 9347), Busy(), null, windows);
 
-            dialog.Show();
+            startUp.Show();
             Application.DoEvents();
 
-            Assert.True(ForegroundWindow.IsTopMost(dialog));
-            dialog.Close();
+            Assert.Equal([$"top {startUp.Handle}"], windows.Calls.Where(call => call.StartsWith("top ", StringComparison.Ordinal)));
+            startUp.Close();
+
+            var menuWindows = new RecordingWindows();
+            using var menu = new PortDialog(new PortPrompt(PortPromptReason.Change, 9347, false, 9347), Busy(), null, menuWindows);
+
+            menu.Show();
+            Application.DoEvents();
+
+            Assert.Empty(menuWindows.Calls);
+            menu.Close();
         });
     }
 

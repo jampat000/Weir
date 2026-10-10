@@ -97,7 +97,7 @@ public static class WeirApi
         await EnsureOkAsync(response, $"Queueing {relativeMediaPath}");
     }
 
-    /// <summary>"Restart to apply": asks the tray to install the update that was downloaded.</summary>
+    /// <summary>"Restart and apply": asks the tray to install the update that was downloaded.</summary>
     public static async Task ApplyUpdateAsync(IBrowserContext context, string baseUrl)
     {
         var token = await CsrfTokenAsync(context, baseUrl);

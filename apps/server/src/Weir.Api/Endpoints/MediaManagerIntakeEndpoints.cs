@@ -180,7 +180,7 @@ internal sealed class MediaManagerIntakeEndpointHandlers
     }
 
     /// <summary>
-    /// <c>GET /intake/library-folders</c>: every enabled library's watched, work and output folders, so a
+    /// <c>GET /intake/library-folders</c>: every enabled library's watched, work and output folders and its minimum file size, so a
     /// media manager reads them instead of a person retyping them, with the manager's own library id for a workflow set up
     /// from one and whether that manager still owns its watched and output folders. Read only; authenticated like
     /// <see cref="GetIntakeCapabilitiesAsync"/>, with no source key of its own (any connection's secret, or the
@@ -209,7 +209,8 @@ internal sealed class MediaManagerIntakeEndpointHandlers
                     new ProcessingLibraryFolderRow(row.Id, row.MediaType, (int)row.DisplayOrder, row.WorkFolder, row.OutputFolder), weirHome),
                 row.OutputFolder,
                 PublishedLibraryFolders.ManagerLibraryKeyOf(row.DiscoveredFromConnectionId, row.DiscoveredLibraryKey),
-                WorkflowSyncRules.FoldersSyncedFrom(row.DiscoveredFromConnectionId, row.DiscoveredLibraryKey, linkedConnectionIds, managerKind) is not null));
+                WorkflowSyncRules.FoldersSyncedFrom(row.DiscoveredFromConnectionId, row.DiscoveredLibraryKey, linkedConnectionIds, managerKind) is not null,
+                PublishedLibraryFolders.MinimumBytesOf(row.MinFileSizeMb)));
         }
 
         return ApiRoutes.Ok(LibraryFolderPublishing.ToOut(libraries));

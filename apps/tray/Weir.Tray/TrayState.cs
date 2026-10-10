@@ -14,6 +14,9 @@ enum ServerPhase
 
     /// <summary>Not running and not coming back by itself: it could not start, or the watchdog gave up.</summary>
     Stopped,
+
+    /// <summary>Asked to stop and finishing its running jobs, which can take most of a minute; on its way to <see cref="Stopped"/>.</summary>
+    Stopping,
 }
 
 /// <summary>The icon's dot, which shows the health of Weir and of what it is set up to talk to, and nothing else.</summary>
@@ -53,7 +56,14 @@ readonly record struct TrayIconKey(TrayDot? Dot, TrayMark Mark);
 /// <param name="UpdateVersion">The version of an update that is downloaded and waiting to install, or null.</param>
 /// <param name="Port">The port the server is on.</param>
 /// <param name="StatusOverdue">A running server has gone past the deadline without a readable status (<see cref="TrayStatusDeadline"/>).</param>
-sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVersion, int Port, bool StatusOverdue = false)
+/// <param name="StartupError">Why a stopped server could not start, when it said so; shown in place of the general "Stopped".</param>
+sealed record TrayState(
+    ServerPhase Phase,
+    TrayStatus? Server,
+    string? UpdateVersion,
+    int Port,
+    bool StatusOverdue = false,
+    StartupError? StartupError = null)
 {
     /// <summary>The longest text a notification-area icon can show on Windows.</summary>
     internal const int HoverLimit = 127;
@@ -116,7 +126,9 @@ sealed record TrayState(ServerPhase Phase, TrayStatus? Server, string? UpdateVer
     // What is wrong stands in for "Running at ...": a running Weir that cannot reach Deluno is not simply running.
     private IEnumerable<string> Headline(List<string> causes) => this switch
     {
+        { Phase: ServerPhase.Stopped, StartupError: { } why } => [$"Stopped - {why.Headline} - choose Restart Weir"],
         { Phase: ServerPhase.Stopped } => ["Stopped - choose Restart Weir"],
+        { Phase: ServerPhase.Stopping } => ["Stopping..."],
         { IsStatusOverdue: true, Reported: null } => ["Can't read its status"],
         { Dot: TrayDot.Starting } => ["Starting..."],
         { IsPaused: true } => ["Paused"],

@@ -45,7 +45,7 @@ public sealed class InstallProcessesTests : IDisposable
         var outside = await _servers.StartAsync(Path.Combine(elsewhere, "server"));
         var log = new List<string>();
 
-        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
+        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test", ServerStopTimeouts.Hook);
 
         Assert.Contains(inside.Id, stopped);
         Assert.DoesNotContain(outside.Id, stopped);
@@ -61,7 +61,7 @@ public sealed class InstallProcessesTests : IDisposable
         var server = await _servers.StartAsync(Path.Combine(install, "server"));
         var log = new List<string>();
 
-        InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
+        InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test", ServerStopTimeouts.Hook);
 
         Assert.True(server.WaitForExit(5_000), "the install's own server should have been stopped");
         Assert.Equal(0, server.ExitCode);
@@ -76,7 +76,7 @@ public sealed class InstallProcessesTests : IDisposable
         var server = await _servers.StartAsync(Path.Combine(install, "server"));
         var log = new List<string>();
 
-        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
+        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test", ServerStopTimeouts.Hook);
 
         Assert.Contains(server.Id, stopped);
         Assert.Contains(tray.Id, stopped);
@@ -114,7 +114,7 @@ public sealed class InstallProcessesTests : IDisposable
         var outside = await _servers.StartTrayAsync(elsewhere);
         var log = new List<string>();
 
-        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
+        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test", ServerStopTimeouts.Hook);
 
         Assert.DoesNotContain(outside.Id, stopped);
         Assert.False(outside.HasExited, "a Weir outside this install must be left running");
@@ -127,7 +127,7 @@ public sealed class InstallProcessesTests : IDisposable
         var server = await _servers.StartAsync(Path.Combine(install, "server"), "no-stop-event");
         var log = new List<string>();
 
-        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test");
+        var stopped = InstallProcesses.StopOwn(install, sameSessionOnly: false, log.Add, "test", ServerStopTimeouts.Hook);
 
         Assert.Contains(server.Id, stopped);
         Assert.True(server.WaitForExit(5_000), "the install's own server should have been stopped");

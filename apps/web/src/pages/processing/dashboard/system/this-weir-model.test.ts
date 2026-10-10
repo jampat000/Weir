@@ -18,6 +18,7 @@ const overview: SystemOverview = {
   jobs_today: { run: 1200, failed: 2 },
   restarts_this_week: 0,
   checks: { passing: 9, total: 10 },
+  last_update_backup: null,
 };
 
 const facts = (changes: Partial<Parameters<typeof weirFacts>[0]> = {}) =>

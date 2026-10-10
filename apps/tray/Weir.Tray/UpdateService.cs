@@ -26,9 +26,9 @@ sealed class UpdateService : IUpdateService
 
     public bool IsInstalled => _mgr.IsInstalled;
 
-    // Velopack reports every failure (network, GitHub, disk) as an exception; each one means "no update this time"
-    // and is logged, so these return false rather than throw.
-    public async Task<bool> CheckForUpdateAsync()
+    // Velopack reports every failure (network, GitHub, disk) as an exception; each one is logged and handed back in
+    // plain words, so these return an outcome rather than throw.
+    public async Task<UpdateOutcome> CheckForUpdateAsync()
     {
         try
         {
@@ -39,27 +39,27 @@ sealed class UpdateService : IUpdateService
                 _log("No update available.");
                 _pendingUpdate = null;
                 _downloaded = false;
-                return false;
+                return UpdateOutcome.NothingToDo;
             }
             _pendingUpdate = info;
             _downloaded = false;
             _downloadProgress = 0;
             _log($"Update available: v{info.TargetFullRelease.Version}");
-            return true;
+            return UpdateOutcome.Succeeded;
         }
         catch (Exception ex)
         {
             _log($"Update check failed: {ex.Message}");
-            return false;
+            return UpdateOutcome.Failed(UpdateFailureText.ForCheck(ex));
         }
     }
 
-    public async Task<bool> DownloadUpdateAsync()
+    public async Task<UpdateOutcome> DownloadUpdateAsync()
     {
         var pending = _pendingUpdate;
         if (pending is null)
         {
-            return false;
+            return UpdateOutcome.NothingToDo;
         }
         try
         {
@@ -67,12 +67,12 @@ sealed class UpdateService : IUpdateService
             await _mgr.DownloadUpdatesAsync(pending, p => _downloadProgress = p).ConfigureAwait(false);
             _downloaded = true;
             _log("Update downloaded successfully.");
-            return true;
+            return UpdateOutcome.Succeeded;
         }
         catch (Exception ex)
         {
             _log($"Update download failed: {ex.Message}");
-            return false;
+            return UpdateOutcome.Failed(UpdateFailureText.ForDownload(ex));
         }
     }
 

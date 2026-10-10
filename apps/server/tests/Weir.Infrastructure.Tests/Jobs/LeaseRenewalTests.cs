@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Weir.Core.Jobs;
@@ -108,6 +111,143 @@ public sealed class LeaseRenewalTests : IDisposable
         Assert.Equal(JobProcessOutcome.Processed, await runTask);
     }
 
+    [Fact]
+    public async Task A_renewal_that_meets_a_busy_database_is_tried_again_at_the_next_tick()
+    {
+        await _db.Store.EnqueueOrGetAsync("busy", Kind, maxAttempts: 3);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new DelegateHandler(Kind, async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+        });
+        var attempts = new List<DateTimeOffset>();
+        using var heartbeatWaiting = new SemaphoreSlim(0);
+        var processor = Processor(handler, heartbeatWaiting, renew: (jobId, owner, expiry) =>
+        {
+            attempts.Add(expiry);
+            return attempts.Count == 1
+                ? throw new SqliteException("database is locked", 5)
+                : _db.Store.RenewLeaseAsync(jobId, owner, expiry, _time.GetUtcNow());
+        });
+
+        const int leaseSeconds = 3;
+        var runTask = processor.ProcessOneAsync("worker", leaseSeconds, _time.GetUtcNow());
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForHeartbeatAsync(heartbeatWaiting);
+
+        for (var step = 0; step < 3; step++)
+        {
+            _time.Advance(TimeSpan.FromSeconds(leaseSeconds / 3.0));
+            await WaitForHeartbeatAsync(heartbeatWaiting);
+        }
+
+        Assert.Equal(3, attempts.Count);
+        release.TrySetResult();
+        Assert.Equal(JobProcessOutcome.Processed, await runTask);
+    }
+
+    [Fact]
+    public async Task A_job_whose_lease_runs_out_while_every_renewal_meets_a_busy_database_is_stopped_and_left_for_recovery()
+    {
+        await _db.Store.EnqueueOrGetAsync("outlived", Kind, maxAttempts: 3);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new UntilCancelledHandler(Kind, started);
+        var attempts = 0;
+        using var heartbeatWaiting = new SemaphoreSlim(0);
+        var processor = Processor(handler, heartbeatWaiting, renew: (_, _, _) =>
+        {
+            attempts++;
+            throw new SqliteException("database is locked", 5);
+        });
+
+        const int leaseSeconds = 3;
+        var runTask = processor.ProcessOneAsync("worker", leaseSeconds, _time.GetUtcNow());
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForHeartbeatAsync(heartbeatWaiting);
+
+        // Two renewals fail inside the lease and the handler keeps running; the lease ends at the third second.
+        for (var step = 0; step < 2; step++)
+        {
+            _time.Advance(TimeSpan.FromSeconds(1));
+            await WaitForHeartbeatAsync(heartbeatWaiting);
+        }
+
+        Assert.False(handler.Cancelled);
+        _time.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(JobProcessOutcome.Processed, await runTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(handler.Cancelled);
+        Assert.True(attempts >= 2);
+        Assert.Equal(ProcessingJobStatus.Leased, (await _db.Store.GetAsync(1))!.Status);
+    }
+
+    [Fact]
+    public async Task A_renewal_that_fails_for_a_reason_other_than_a_busy_database_does_not_stop_the_job()
+    {
+        await _db.Store.EnqueueOrGetAsync("broken", Kind, maxAttempts: 3);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new DelegateHandler(Kind, async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+        });
+        using var heartbeatWaiting = new SemaphoreSlim(0);
+        var log = new MessageLog();
+        var processor = Processor(handler, heartbeatWaiting, renew: (_, _, _) => throw new SqliteException("disk I/O error", 10), logger: log);
+
+        const int leaseSeconds = 3;
+        var runTask = processor.ProcessOneAsync("worker", leaseSeconds, _time.GetUtcNow());
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForHeartbeatAsync(heartbeatWaiting);
+
+        // The renewal loop ends on the first failure, as it always has, and the lease runs out without the handler being stopped.
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await Eventually.ThatAsync(() => log.Messages.Any(message => message.StartsWith("Lease renewal loop crashed", StringComparison.Ordinal)));
+        _time.Advance(TimeSpan.FromSeconds(5));
+        release.TrySetResult();
+
+        Assert.Equal(JobProcessOutcome.Processed, await runTask.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    private sealed class MessageLog : ILogger<ProcessingJobProcessor>
+    {
+        private readonly ConcurrentQueue<string> _messages = new();
+
+        public IEnumerable<string> Messages => _messages;
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            _messages.Enqueue(formatter(state, exception));
+    }
+
+    private sealed class UntilCancelledHandler(string jobKind, TaskCompletionSource started) : IJobHandler
+    {
+        public string JobKind => jobKind;
+
+        public bool Cancelled { get; private set; }
+
+        public async Task HandleAsync(JobWorkContext context, CancellationToken cancellationToken)
+        {
+            started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                Cancelled = true;
+                throw;
+            }
+        }
+    }
+
     /// <summary>
     /// Wait for the heartbeat's next "waiting for my next tick" signal. A missing signal means the heartbeat
     /// stopped renewing (it lost the lease, or crashed), which is exactly what these tests must catch.
@@ -117,7 +257,7 @@ public sealed class LeaseRenewalTests : IDisposable
             await heartbeatWaiting.WaitAsync(TimeSpan.FromSeconds(5)),
             "The lease-renewal heartbeat did not renew and wait for its next tick in time.");
 
-    private ProcessingJobProcessor Processor(IJobHandler handler, SemaphoreSlim? heartbeatWaiting = null) =>
+    private ProcessingJobProcessor Processor(IJobHandler handler, SemaphoreSlim? heartbeatWaiting = null, Func<long, string, DateTimeOffset, Task<bool>>? renew = null, ILogger<ProcessingJobProcessor>? logger = null) =>
         new(
             new ProcessingJobStore(new SqliteDatabase(_db.DbPath, pooling: false), _time),
             new JobHandlerRegistry([handler]),
@@ -125,8 +265,9 @@ public sealed class LeaseRenewalTests : IDisposable
             new NoUnhandledJobFailureRecorder(),
             new NoJobNotifications(),
             _time,
-            NullLogger<ProcessingJobProcessor>.Instance)
+            logger ?? NullLogger<ProcessingJobProcessor>.Instance)
         {
             LeaseRenewalWaiting = heartbeatWaiting is null ? null : () => heartbeatWaiting.Release(),
+            RenewOverride = renew,
         };
 }

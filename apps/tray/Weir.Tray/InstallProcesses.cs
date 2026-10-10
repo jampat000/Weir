@@ -58,15 +58,13 @@ static class InstallProcesses
     /// except this process. <paramref name="sameSessionOnly"/> narrows it to this Windows session.
     /// Everything else is logged and left running. Returns the ids stopped.
     /// </summary>
-    internal static List<int> StopOwn(string root, bool sameSessionOnly, Action<string> log, string why) =>
-        StopOwn(root, sameSessionOnly, log, why, ServerStopTimeouts.Default);
-
     /// <summary>
     /// The servers go first, asked to stop through their stop event so they finish running jobs and close their
     /// database (#833, #868); the tray is stopped only after them, and without its process tree. Killing the tray
     /// with its tree first would end the server it started before it could be asked. A server that does not exit in
     /// time, or cannot be asked, is killed with its own tree as the fallback. The waits are bounded by
-    /// <paramref name="timeouts"/> and stay well inside the 30 seconds Velopack gives an install or uninstall hook.
+    /// <paramref name="timeouts"/>: a caller picks the budget that fits where it is called, because the install and
+    /// uninstall hooks are ended by Velopack after 30 seconds and start-up has a person waiting.
     /// </summary>
     internal static List<int> StopOwn(string root, bool sameSessionOnly, Action<string> log, string why, ServerStopTimeouts timeouts)
     {

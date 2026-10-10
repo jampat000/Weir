@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Weir.Api.Http;
 using Weir.Core.Auth;
+using Weir.Core.Json;
 using Weir.Core.Updates;
 using Weir.Core.Validation;
 using Weir.Infrastructure.Http;
@@ -11,7 +12,7 @@ using Weir.Infrastructure.Runtime;
 
 namespace Weir.Api.Endpoints;
 
-/// <summary>Update status, update settings and the apply-update flow.</summary>
+/// <summary>Update status, update settings, and the check, download and apply steps a person asks the tray for.</summary>
 public static class SuiteUpdateEndpoints
 {
     public static IEndpointRouteBuilder MapSuiteUpdateEndpoints(this IEndpointRouteBuilder endpoints)
@@ -21,6 +22,8 @@ public static class SuiteUpdateEndpoints
         endpoints.MapV1("GET", "/suite/update-settings", handlers.GetUpdateSettingsAsync);
         endpoints.MapV1("PUT", "/suite/update-settings", handlers.PutUpdateSettingsAsync);
         endpoints.MapV1("GET", "/suite/update-state", handlers.GetUpdateStateAsync);
+        endpoints.MapV1("POST", "/suite/check-update", handlers.PostCheckUpdateAsync);
+        endpoints.MapV1("POST", "/suite/download-update", handlers.PostDownloadUpdateAsync);
         endpoints.MapV1("POST", "/suite/apply-update", handlers.PostApplyUpdateAsync);
         return endpoints;
     }
@@ -76,7 +79,68 @@ internal sealed class SuiteUpdateEndpointHandlers
         return ApiRoutes.Ok(_files.ReadState());
     }
 
+    public Task<ApiResult> PostCheckUpdateAsync(ApiRequest request) =>
+        AskTrayAsync(request, UpdateStatus.StateChecking, _files.WriteCheckFlag);
+
+    public Task<ApiResult> PostDownloadUpdateAsync(ApiRequest request) =>
+        AskTrayAsync(request, UpdateStatus.StateDownloading, _files.WriteDownloadFlag);
+
+    /// <summary>
+    /// Asks the tray for <paramref name="step"/> by writing its flag. A step already under way is not asked for again, and a
+    /// step that cannot run now, because another is under way or the update is downloaded, is refused with the reason.
+    /// </summary>
+    private async Task<ApiResult> AskTrayAsync(ApiRequest request, string step, Action ask)
+    {
+        await RequireConfirmedAdminAsync(request).ConfigureAwait(false);
+        RequireTray();
+        var state = _files.ReadState();
+        if (state.Get("downloaded")?.IsTruthy ?? false)
+        {
+            throw new ApiException(StatusCodes.Status409Conflict, "An update is already downloaded. Restart Weir to apply it.");
+        }
+
+        var current = (state.Get("state") as WireString)?.Value;
+        if (current == step)
+        {
+            return ApiRoutes.Ok(state);
+        }
+
+        if (current is UpdateStatus.StateChecking or UpdateStatus.StateDownloading)
+        {
+            throw new ApiException(
+                StatusCodes.Status409Conflict,
+                current == UpdateStatus.StateChecking ? "Weir is still checking for updates." : "Weir is downloading an update right now.");
+        }
+
+        ask();
+        return ApiRoutes.Ok(UpdateStatus.WithStep(state, step).Set("tray_running", true));
+    }
+
     public async Task<ApiResult> PostApplyUpdateAsync(ApiRequest request)
+    {
+        await RequireConfirmedAdminAsync(request).ConfigureAwait(false);
+        RequireTray();
+        var state = _files.ReadState();
+        if (!(state.Get("downloaded")?.IsTruthy ?? false))
+        {
+            throw new ApiException(StatusCodes.Status409Conflict, "No downloaded update is pending.");
+        }
+
+        _files.WriteApplyFlag();
+        return ApiRoutes.Ok(state);
+    }
+
+    /// <summary>A flag is answered only by a tray: a Docker or source install has none, and one that quit or died answers nothing.</summary>
+    private void RequireTray()
+    {
+        if (!_files.TrayIsRunning())
+        {
+            throw new ApiException(StatusCodes.Status409Conflict, "The Weir tray isn't running, so Weir can't update itself from here.");
+        }
+    }
+
+    /// <summary>An update step is for an administrator, and carries the confirmation token and nothing else.</summary>
+    private static async Task RequireConfirmedAdminAsync(ApiRequest request)
     {
         var body = await request.ReadBodyAsync().ConfigureAwait(false);
         await request.RequireUserAsync(UserRoles.AdminOnly).ConfigureAwait(false);
@@ -87,13 +151,5 @@ internal sealed class SuiteUpdateEndpointHandlers
         issues.ThrowIfAny();
 
         request.RequireConfirmationToken(csrfToken);
-        var state = _files.ReadState();
-        if (!(state.Get("downloaded")?.IsTruthy ?? false))
-        {
-            throw new ApiException(StatusCodes.Status409Conflict, "No downloaded update is pending.");
-        }
-
-        _files.WriteApplyFlag();
-        return ApiRoutes.Ok(state);
     }
 }

@@ -13,13 +13,13 @@ The image is `ghcr.io/jampat000/weir`. The tag after the colon picks the version
 
 | Tag | What it is | Use it when |
 | --- | --- | --- |
-| `1.0.0-rc.12` | Exactly that release, forever | You want to choose when Weir changes. **Use this while Weir is a release candidate.** Newer ones are listed on the [Releases page](https://github.com/jampat000/Weir/releases). |
+| `1.0.0-rc.13` | Exactly that release, forever | You want to choose when Weir changes. **Use this while Weir is a release candidate.** Newer ones are listed on the [Releases page](https://github.com/jampat000/Weir/releases). |
 | `latest` | The newest stable release | You are happy for `docker compose pull` to move you to whatever is newest. It does not exist yet: it arrives with 1.0.0. |
 
 Release candidates are published under their version tag only. They never move `latest`, so until 1.0.0 you
 name the version, as every example below does.
 
-The image tag has no `v`: the release `v1.0.0-rc.12` is the image `1.0.0-rc.12`.
+The image tag has no `v`: the release `v1.0.0-rc.13` is the image `1.0.0-rc.13`.
 
 ## 1. The quickest start
 
@@ -28,7 +28,7 @@ Make a folder for Weir, and save this as `compose.yaml` inside it:
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.12
+    image: ghcr.io/jampat000/weir:1.0.0-rc.13
     container_name: weir
     hostname: my-server        # what Weir calls itself: "Weir on my-server"
     ports:
@@ -59,7 +59,7 @@ This is the version most people want: your media folders, the right file owner, 
 ```yaml
 services:
   weir:
-    image: ghcr.io/jampat000/weir:1.0.0-rc.12
+    image: ghcr.io/jampat000/weir:1.0.0-rc.13
     container_name: weir
     hostname: my-server
     ports:
@@ -88,7 +88,7 @@ docker run -d \
   -v "$(pwd)/weir-data:/data/weir" \
   -v /srv/media:/media \
   --restart unless-stopped \
-  ghcr.io/jampat000/weir:1.0.0-rc.12
+  ghcr.io/jampat000/weir:1.0.0-rc.13
 ```
 
 What each part means:
@@ -212,7 +212,7 @@ and reach it only through a proxy on the same machine, publish it on the loopbac
 
 Weir updates its own database when it starts, so updating is just replacing the container.
 
-With a pinned tag, edit the tag in `compose.yaml` first (for example `1.0.0-rc.12`), then:
+With a pinned tag, edit the tag in `compose.yaml` first (for example `1.0.0-rc.13`), then:
 
 ```bash
 docker compose pull
@@ -223,12 +223,16 @@ Once 1.0.0 is out and you use `latest`, only the two commands are needed. With `
 remove the old container and run the same `docker run` command again:
 
 ```bash
-docker pull ghcr.io/jampat000/weir:1.0.0-rc.12
+docker pull ghcr.io/jampat000/weir:1.0.0-rc.13
 docker stop weir && docker rm weir
 ```
 
 Your data is in `weir-data`, so it carries over. Take a backup first (below). Going back to an older version
-after an upgrade is only safe from a backup made before it.
+after an upgrade is only safe from a backup made before it. When the new version has to change the database, it first
+saves a copy of the database, your settings files and the two secrets in `weir-data/backups/pre-update` (the newest five
+are kept), and does not start if it cannot, saying why in the container log. It logs "Saving a copy of Weir's data (N MB)
+before updating…" first; the image's healthcheck allows five minutes for that. If you set your own `healthcheck:`, give it a
+`start_period` as long as the copy takes. **System › About** says where the latest copy is, inside the `weir-data` volume.
 
 ## Back up
 

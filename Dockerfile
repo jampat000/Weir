@@ -151,7 +151,9 @@ ENV WEIR_ENV=production
 
 EXPOSE 9347
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=50s --retries=3 \
+# A start that updates the database first saves a copy of it (docs/install-docker.md), which takes as long as copying the
+# database does; the start period is long enough for a large one, and failures inside it do not count.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5m --retries=3 \
   CMD ["/bin/sh", "-c", "/opt/weir/Weir --healthcheck --port \"${PORT:-9347}\""]
 
 ENTRYPOINT ["/entrypoint.sh"]

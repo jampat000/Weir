@@ -34,7 +34,7 @@ public sealed class MkvmergeUnsupportedPlanException(string message) : Exception
 /// </summary>
 public static partial class MkvmergeCommands
 {
-    /// <summary>The wall-clock limit for one mkvmerge run, matching <see cref="FfmpegCommands.FfmpegTimeoutSeconds"/>.</summary>
+    /// <summary>The least wall-clock one mkvmerge run is allowed, matching <see cref="FfmpegCommands.FfmpegTimeoutSeconds"/>; <see cref="ToolTimeLimits.OverallSeconds"/> adds the time the file needs.</summary>
     public const int MkvmergeTimeoutSeconds = FfmpegCommands.FfmpegTimeoutSeconds;
 
     /// <summary>The limit for an identification run, which only reads headers.</summary>

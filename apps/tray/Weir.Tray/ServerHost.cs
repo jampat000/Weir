@@ -18,7 +18,17 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private const string ServerExeName = "WeirServer.exe";
     private const int MaxRestarts = 5;
 
-    private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// How long a server that has not answered at all is waited for: a server that cannot listen, or a port something else holds,
+    /// shows within a minute. One that exits is noticed at once.
+    /// </summary>
+    internal static readonly TimeSpan DefaultNothingAnswersTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// How long a server that has answered "not ready" is waited for. It is alive and starting; a slow start, such as a large
+    /// database migrated on a busy PC, must not be reported as a failure while it is still going to succeed.
+    /// </summary>
+    internal static readonly TimeSpan DefaultStartingTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(3);
 
     /// <summary>How long a stop waits for a restart or port change in progress to let go of the server.</summary>
@@ -45,23 +55,45 @@ sealed class ServerHost : IServerListenScope, IDisposable
     private volatile int _port;
     private volatile ListenScope _scope;
     private volatile ServerPhase _phase = ServerPhase.Starting;
+    private volatile StartupError? _startupError;
     private long _startedAtTicks;
+    private bool _waitingForSave;
     private Task? _watchdog;
     private Action? _onGaveUp;
     private CancellationToken _watchdogToken;
 
-    internal ServerHost(string runtimeHome, string installRoot, int port, ListenScope scope)
+    private readonly TimeSpan _nothingAnswersTimeout;
+    private readonly TimeSpan _startingTimeout;
+
+    // The two timeouts are how long to wait for a server that has not answered at all and for one that has answered "not ready"; the
+    // defaults when null. Tests shorten them.
+    internal ServerHost(
+        string runtimeHome,
+        string installRoot,
+        int port,
+        ListenScope scope,
+        TimeSpan? nothingAnswersTimeout = null,
+        TimeSpan? startingTimeout = null)
     {
         _runtimeHome = runtimeHome;
         _installRoot = installRoot;
         _port = port;
         _scope = scope;
+        _nothingAnswersTimeout = nothingAnswersTimeout ?? DefaultNothingAnswersTimeout;
+        _startingTimeout = startingTimeout ?? DefaultStartingTimeout;
     }
+
+    /// <summary>Whether the server process this host started is still running, ready or not.</summary>
+    internal bool ServerIsRunning => _process is { HasExited: false };
 
     /// <summary>Raised, on whichever thread changed it, when <see cref="Phase"/> changes.</summary>
     internal event Action? PhaseChanged;
 
     internal int Port => _port;
+
+    /// <summary>The server process this host started, while it runs, or null.</summary>
+    internal RunningServer? Running =>
+        _process is { HasExited: false } process && StartedAtUtc is { } started ? new RunningServer(process.Id, started) : null;
 
     /// <summary>Where the server is: being started, answering, or stopped with nothing about to bring it back.</summary>
     internal ServerPhase Phase => _phase;
@@ -71,12 +103,19 @@ sealed class ServerHost : IServerListenScope, IDisposable
     /// <summary>When the server process this host last started began, or null if it has started none.</summary>
     internal DateTime? StartedAtUtc => Volatile.Read(ref _startedAtTicks) is > 0 and var ticks ? new DateTime(ticks, DateTimeKind.Utc) : null;
 
+    /// <summary>
+    /// Why the server could not start, in its own words, while <see cref="Phase"/> is Stopped and the server said why
+    /// (StartupNotes); null otherwise.
+    /// </summary>
+    internal StartupError? StartupError => _startupError;
+
     private void SetPhase(ServerPhase phase)
     {
         if (_phase == phase)
         {
             return;
         }
+        _startupError = phase == ServerPhase.Stopped ? StartupNotes.ReadError(_runtimeHome, StartedAtUtc) : null;
         _phase = phase;
         PhaseChanged?.Invoke();
     }
@@ -191,6 +230,14 @@ sealed class ServerHost : IServerListenScope, IDisposable
             TrayLog.Write($"Waiting {delay.TotalMilliseconds:0}ms before restarting server...");
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             failedRestarts = await RestartAsync(exited, cancellationToken).ConfigureAwait(false) ? 0 : failedRestarts + 1;
+            if (failedRestarts > 0 && StartupNotes.ReadError(_runtimeHome, StartedAtUtc) is { } reason)
+            {
+                // The server said why it cannot start. One more try has been made; another would fail the same way.
+                TrayLog.Write($"The server said why it cannot start, so it is not tried again: {reason.Detail}");
+                SetPhase(ServerPhase.Stopped);
+                onGaveUp();
+                return;
+            }
         }
     }
 
@@ -347,7 +394,10 @@ sealed class ServerHost : IServerListenScope, IDisposable
         var entered = await _gate.WaitAsync(StopGateWait).ConfigureAwait(false);
         try
         {
+            // The icon says so while the server finishes its jobs, which can take most of a minute.
+            SetPhase(ServerPhase.Stopping);
             await StopProcessAsync().ConfigureAwait(false);
+            SetPhase(ServerPhase.Stopped);
         }
         finally
         {
@@ -404,15 +454,52 @@ sealed class ServerHost : IServerListenScope, IDisposable
         }
     }
 
-    private Task WaitForHealthAsync(CancellationToken cancellationToken)
+    private async Task WaitForHealthAsync(CancellationToken cancellationToken)
     {
         var process = _process;
-        return ServerHealth.WaitUntilReadyAsync(
-            _http,
-            new Uri($"http://127.0.0.1:{_port}/ready"),
-            () => process is { HasExited: true } ? process.ExitCode : null,
-            new ServerHealth.Timing(HealthTimeout, ServerHealth.RetryDelay, TimeProvider.System),
-            cancellationToken);
+        try
+        {
+            await ServerHealth.WaitUntilReadyAsync(
+                _http,
+                new Uri($"http://127.0.0.1:{_port}/ready"),
+                () => process is { HasExited: true } ? process.ExitCode : null,
+                new ServerHealth.Timing(
+                    _nothingAnswersTimeout,
+                    ServerHealth.RetryDelay,
+                    TimeProvider.System,
+                    _startingTimeout,
+                    () => IsSavingBeforeUpdate(process)),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException ex)
+        {
+            // A server that never became ready is not left running behind a tray that says it has stopped. Its process is kept, exited,
+            // so the watchdog sees it and starts it again like any other that exited.
+            TrayLog.Write($"{ex.Message} Stopping it.");
+            if (process is { HasExited: false })
+            {
+                await ServerProcessStop.StopAsync(process, ServerStopTimeouts.Orphan).ConfigureAwait(false);
+            }
+
+            throw;
+        }
+    }
+
+    // A server that is alive and keeps saying it is busy before it can answer (saving a copy of the data before an update) is
+    // waited for for as long as its note stays fresh (StartupNotes.ProgressFreshFor); one that says nothing gets the timeouts above.
+    private bool IsSavingBeforeUpdate(Process? process)
+    {
+        if (process is not { HasExited: false } || !StartupNotes.IsBusy(_runtimeHome, StartedAtUtc, DateTime.UtcNow))
+        {
+            _waitingForSave = false;
+            return false;
+        }
+        if (!_waitingForSave)
+        {
+            _waitingForSave = true;
+            TrayLog.Write("The server is saving a copy of Weir's data before updating; waiting for it to finish.");
+        }
+        return true;
     }
 
     private string FindServerExeDirectory()

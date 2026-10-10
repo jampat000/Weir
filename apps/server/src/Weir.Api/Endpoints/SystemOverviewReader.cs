@@ -34,6 +34,7 @@ internal sealed class SystemOverviewReader
     private readonly UpdateOutlook _updates;
     private readonly SuiteSettingsStore _suiteSettings;
     private readonly SystemChecks _checks;
+    private readonly WeirOptions _options;
 
     public SystemOverviewReader(
         ServerLifecycle lifecycle,
@@ -48,7 +49,8 @@ internal sealed class SystemOverviewReader
         DataFootprint footprint,
         UpdateOutlook updates,
         SuiteSettingsStore suiteSettings,
-        SystemChecks checks)
+        SystemChecks checks,
+        WeirOptions options)
     {
         _lifecycle = lifecycle ?? throw new ArgumentNullException(nameof(lifecycle));
         _listen = listen ?? throw new ArgumentNullException(nameof(listen));
@@ -63,6 +65,7 @@ internal sealed class SystemOverviewReader
         _updates = updates ?? throw new ArgumentNullException(nameof(updates));
         _suiteSettings = suiteSettings ?? throw new ArgumentNullException(nameof(suiteSettings));
         _checks = checks ?? throw new ArgumentNullException(nameof(checks));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
     public async Task<WireObject> ReadAsync(UnitOfWork uow, IServiceProvider services, CancellationToken cancellationToken)
@@ -97,7 +100,23 @@ internal sealed class SystemOverviewReader
                 .Set("errors_today", requests.ServerErrors))
             .Set("jobs_today", new WireObject().Set("run", jobsToday.Run).Set("failed", jobsToday.Failed))
             .Set("restarts_this_week", restarts)
-            .Set("checks", new WireObject().Set("passing", checks.Passing).Set("total", checks.Total));
+            .Set("checks", new WireObject().Set("passing", checks.Passing).Set("total", checks.Total))
+            .Set("last_update_backup", UpdateBackupOut(PreUpdateBackup.Latest(_options.BackupDir)));
+    }
+
+    private WireValue UpdateBackupOut(PreUpdateBackupFile? backup) => backup is null
+        ? WireNull.Instance
+        : new WireObject()
+            .Set("path", backup.DatabasePath)
+            .Set("taken_at", Timestamp.FromDateTimeOffset(backup.TakenAt).ToWireText())
+            .Set("from_version", backup.FromVersion)
+            .Set("to_version", backup.ToVersion)
+            .Set("in_data_folder", IsInDataFolder(backup.DatabasePath));
+
+    private bool IsInDataFolder(string path)
+    {
+        var relative = Path.GetRelativePath(_options.WeirHome, path);
+        return relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) && !Path.IsPathRooted(relative);
     }
 
     /// <summary>

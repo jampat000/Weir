@@ -79,7 +79,7 @@ public enum SchemaStartupOutcome
 /// <b>On startup:</b> a missing database file is created at head; a database whose recorded revision is
 /// head is adopted unchanged; a database recorded at any earlier revision in <see cref="Migrations"/> (the
 /// baseline or a later migration) is upgraded in place by applying every migration after it, in order, in
-/// one transaction (#557); anything else, including an existing file with no schema or a revision this
+/// one transaction (#557), after the caller's <c>beforeUpgrade</c> step (the pre-update backup) has succeeded; anything else, including an existing file with no schema or a revision this
 /// build does not list, is refused with a message and no change. Weir only opens a database that Weir
 /// created.
 /// </para>
@@ -150,7 +150,11 @@ public sealed class SchemaMigrator
         _database = database;
     }
 
-    public SchemaStartupOutcome EnsureAtHead()
+    /// <param name="beforeUpgrade">
+    /// Called with the open connection and the recorded revision once a database is known to need migrating, before any
+    /// migration runs. When it throws, the migrations are not run and the database is left as it was.
+    /// </param>
+    public SchemaStartupOutcome EnsureAtHead(Action<SqliteConnection, string>? beforeUpgrade = null)
     {
         // Only a missing file is a new install. A file that exists but holds no schema was made by
         // something else (or by a start that failed half-way), so it is refused as unversioned without
@@ -183,6 +187,7 @@ public sealed class SchemaMigrator
         var currentIndex = Migrations.ToList().FindIndex(m => m.Revision == current);
         if (currentIndex >= 0)
         {
+            beforeUpgrade?.Invoke(connection, current!);
             ApplyRange(connection, Migrations.Skip(currentIndex + 1), HeadRevision);
             return SchemaStartupOutcome.Upgraded;
         }
@@ -289,7 +294,7 @@ public sealed class SchemaMigrator
         transaction.Commit();
     }
 
-    private static string? ReadRecordedRevision(SqliteConnection connection)
+    internal static string? ReadRecordedRevision(SqliteConnection connection)
     {
         var ledger = FindLedger(connection);
         var revisions = new List<string>();

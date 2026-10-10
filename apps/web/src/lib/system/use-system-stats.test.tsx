@@ -127,6 +127,7 @@ const overview = (jobsRun: number): SystemOverview => ({
   jobs_today: { run: jobsRun, failed: 0 },
   restarts_this_week: 0,
   checks: { passing: 5, total: 5 },
+  last_update_backup: null,
 });
 
 function setup(stats?: SystemStats) {

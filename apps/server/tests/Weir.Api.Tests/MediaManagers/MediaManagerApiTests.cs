@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Weir.Core;
 using Weir.Core.Configuration;
+using Weir.Core.Processing;
 using Weir.Infrastructure.ConnectionTraffic;
 using Weir.Infrastructure.Jobs;
 using Weir.Infrastructure.MediaManagers;
@@ -541,6 +542,26 @@ public sealed class MediaManagerApiTests
         Assert.Equal("/media/movies/watched", library["watched_folder"]!.GetValue<string>());
         Assert.Equal("/media/movies/work", library["work_folder"]!.GetValue<string>());
         Assert.Equal("/media/movies/output", library["output_folder"]!.GetValue<string>());
+        Assert.Equal(LibraryIntake.DefaultMinFileSizeMb * 1024 * 1024, library["minimum_file_size_bytes"]!.GetValue<long>());
+    }
+
+    /// <summary>A workflow's minimum file size is published in bytes, and as null once the workflow has no minimum.</summary>
+    [Fact]
+    public async Task Library_folders_carry_each_workflows_minimum_file_size()
+    {
+        var (server, admin, _) = await StartAsync(("WEIR_MEDIA_MANAGER_WEBHOOK_SECRET", "s3cret"));
+        await using var _server = server;
+        var secret = new Dictionary<string, string> { ["X-Webhook-Secret"] = "s3cret" };
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET min_file_size_mb = 120 WHERE media_type = 'movie'");
+        await TestDatabase.ExecuteAsync(server, "UPDATE libraries SET min_file_size_mb = 0 WHERE media_type = 'tv'");
+
+        using var response = await admin.GetAsync("/api/v1/intake/library-folders", secret);
+        var minimums = (await Json(response))!["libraries"]!.AsArray().ToDictionary(
+            library => library!["media_type"]!.GetValue<string>(),
+            library => library!["minimum_file_size_bytes"]?.GetValue<long>());
+
+        Assert.Equal(120L * 1024 * 1024, minimums["movie"]);
+        Assert.Null(minimums["tv"]);
     }
 
     /// <summary>

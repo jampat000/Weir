@@ -102,12 +102,7 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
         await using (var stopped = await server.StopForDatabaseAsync(restart: false))
         {
             head = Revision(stopped.Connection);
-            RecordRevisionInOldTable(stopped.Connection, PreviousRevision);
-            // A real database at that revision has none of what later migrations added; take those back out, or the upgrade
-            // would add them a second time.
-            SeedSql.Execute(stopped.Connection, "ALTER TABLE media_manager_handoff_targets DROP COLUMN output_written_at");
-            SeedSql.Execute(stopped.Connection, "ALTER TABLE files DROP COLUMN skip_kind");
-            SeedSql.Execute(stopped.Connection, "DROP INDEX ix_activity_events_current");
+            MakeOlder(stopped.Connection);
             Assert.DoesNotContain("schema_version", Tables(stopped.Connection));
         }
 
@@ -121,6 +116,63 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
         Assert.Equal(head, Revision(upgraded.Connection));
         Assert.DoesNotContain("alembic_version", Tables(upgraded.Connection));
         Assert.Single(SeedSql.Rows(upgraded.Connection, "SELECT revision FROM schema_version"));
+    }
+
+    /// <summary>The update keeps a copy of the data as it was, which opens at the old revision, and the log says where it is.</summary>
+    [Fact]
+    public async Task An_upgrade_first_saves_a_copy_of_the_database_at_its_old_revision()
+    {
+        await using var server = await WeirServer.StartNewAsync();
+        await using (var stopped = await server.StopForDatabaseAsync(restart: false))
+        {
+            MakeOlder(stopped.Connection);
+        }
+
+        await server.RestartAsync();
+
+        var copy = Assert.Single(Directory.GetFiles(Path.Combine(server.Home, "backups", "pre-update"), "weir-0073-to-*.db"));
+        using var opened = new SqliteConnection($"Data Source={copy};Mode=ReadOnly;Pooling=False");
+        opened.Open();
+        Assert.Equal(PreviousRevision, (string?)SeedSql.Scalar(opened, "SELECT version_num FROM alembic_version"));
+        Assert.Contains("Before updating, Weir saved a copy of its data", server.LogText(), StringComparison.Ordinal);
+        Assert.Contains(Path.GetFileName(copy), server.LogText(), StringComparison.Ordinal);
+    }
+
+    /// <summary>A copy that cannot be saved stops the start before any migration, with the reason, and the next start can still update.</summary>
+    [Fact]
+    public async Task An_upgrade_that_cannot_save_its_copy_does_not_start_and_changes_nothing()
+    {
+        await using var server = await WeirServer.StartNewAsync();
+        await using (var stopped = await server.StopForDatabaseAsync(restart: false))
+        {
+            MakeOlder(stopped.Connection);
+        }
+
+        var inTheWay = Path.Combine(server.Home, "backups", "pre-update");
+        Directory.CreateDirectory(Path.GetDirectoryName(inTheWay)!);
+        await File.WriteAllTextAsync(inTheWay, "in the way");
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => server.RestartAsync());
+        Assert.Contains("Weir couldn't save a copy of its data before updating, so it didn't change anything:", error.Message, StringComparison.Ordinal);
+        Assert.False(server.IsRunning);
+
+        // The reason is left for the tray, which shows it instead of a bare "couldn't start".
+        var note = (await File.ReadAllTextAsync(Path.Combine(server.Home, "startup-error.txt"))).Split('\n', 2);
+        Assert.Equal("Couldn't save a copy of its data before updating", note[0]);
+        Assert.StartsWith("Weir couldn't save a copy of its data before updating, so it didn't change anything:", note[1], StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(server.Home, "startup-progress.txt")));
+
+        await using (var after = await server.StopForDatabaseAsync(restart: false))
+        {
+            Assert.Equal(PreviousRevision, (string?)SeedSql.Scalar(after.Connection, "SELECT version_num FROM alembic_version"));
+            Assert.DoesNotContain("schema_version", Tables(after.Connection));
+        }
+
+        File.Delete(inTheWay);
+        await server.RestartAsync();
+        using var client = server.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).Status);
+        Assert.False(File.Exists(Path.Combine(server.Home, "startup-error.txt")));
     }
 
     /// <summary>A revision this build has never heard of is refused whichever table holds it, and the file is left as it was.</summary>
@@ -212,6 +264,17 @@ public sealed class StartupSchemaTests(StartupSchemaTests.HeadSchemaFixture fixt
         SeedSql.Rows(connection, "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
             .Select(row => (string)row["name"]!)
             .ToList();
+
+    /// <summary>Takes a database at head back to <see cref="PreviousRevision"/>, recorded the way that release recorded it.</summary>
+    private static void MakeOlder(SqliteConnection connection)
+    {
+        RecordRevisionInOldTable(connection, PreviousRevision);
+        // A real database at that revision has none of what later migrations added; take those back out, or the upgrade
+        // would add them a second time.
+        SeedSql.Execute(connection, "ALTER TABLE media_manager_handoff_targets DROP COLUMN output_written_at");
+        SeedSql.Execute(connection, "ALTER TABLE files DROP COLUMN skip_kind");
+        SeedSql.Execute(connection, "DROP INDEX ix_activity_events_current");
+    }
 
     /// <summary>
     /// Puts the version record back the way a release before the schema_version table wrote it. Migration 39 only

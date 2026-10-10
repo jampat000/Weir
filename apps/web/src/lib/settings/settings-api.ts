@@ -34,6 +34,8 @@ export const operationalHistoryResetPath = () =>
   "/api/v1/suite/operational-history/reset";
 export const updateSettingsPath = () => "/api/v1/suite/update-settings";
 export const updateStatePath = () => "/api/v1/suite/update-state";
+export const checkUpdatePath = () => "/api/v1/suite/check-update";
+export const downloadUpdatePath = () => "/api/v1/suite/download-update";
 export const applyUpdatePath = () => "/api/v1/suite/apply-update";
 
 /** GET/PUT configuration bundle, at its one address: a 404 here means the request is wrong. */
@@ -152,6 +154,23 @@ export async function fetchUpdateState(): Promise<UpdateStateOut> {
   const path = updateStatePath();
   const r = await apiFetch(path);
   await requireOk(path, r, "Could not load update state");
+  return readJson<UpdateStateOut>(r);
+}
+
+export async function postCheckUpdate(): Promise<UpdateStateOut> {
+  const path = checkUpdatePath();
+  const r = await sendJson(
+    path,
+    "POST",
+    {},
+    "Could not ask for an update check",
+  );
+  return readJson<UpdateStateOut>(r);
+}
+
+export async function postDownloadUpdate(): Promise<UpdateStateOut> {
+  const path = downloadUpdatePath();
+  const r = await sendJson(path, "POST", {}, "Could not ask for the download");
   return readJson<UpdateStateOut>(r);
 }
 

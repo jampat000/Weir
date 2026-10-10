@@ -28,6 +28,11 @@ This checklist defines the current practical hardening baseline for Weir.
   accounts: on Windows the tray locks it to its owner on every start; in Docker the entrypoint writes secrets
   with `umask 077` and runs the server as a non-root user; a bare source install should restrict `WEIR_HOME`
   itself (for example `chmod 700`).
+- The copy taken before an update (`backups/pre-update`) holds the database, with its sessions and saved connection keys,
+  and copies of `session.secret` and `credentials.secret` (the keys can only be read with the second). It is owner-only
+  wherever it is kept, even when `WEIR_BACKUP_DIR` is outside the data folder: folder `700` and files `600` on Linux and in
+  Docker, and on Windows an explicit access list (SYSTEM, Administrators and the account Weir runs as, nothing
+  inherited) on the folder and on every file.
 - Real `.env` files must never be committed.
 - Runtime SQLite databases must never be committed.
 - Logs, backups, media paths, API keys, provider tokens, and session secrets must never be committed.
@@ -40,7 +45,9 @@ This checklist defines the current practical hardening baseline for Weir.
 - To rotate `WEIR_CREDENTIALS_SECRET`, set the new value as `WEIR_CREDENTIALS_SECRET`, add the old value to
   `WEIR_PREVIOUS_CREDENTIALS_SECRETS`, restart Weir, then re-save every media manager
   connection (Setup › Connections › Media managers). After every saved credential has been re-written with the new value, remove the old value from
-  `WEIR_PREVIOUS_CREDENTIALS_SECRETS` and restart again.
+  `WEIR_PREVIOUS_CREDENTIALS_SECRETS` and restart again. Copies already in `backups/pre-update` keep the credentials secret
+  they were made with (their `.credentials.secret` file) and the keys encrypted with it; they do not follow the rotation, so
+  delete them once you no longer need them, or keep them as a pair.
 
 ## Repository and dependency controls
 

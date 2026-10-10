@@ -22,7 +22,11 @@ internal sealed class ScriptedRunner(Func<ProcessRequest, ScriptedRun> script) :
 
         if (request.OnStdoutLine is not null)
         {
-            foreach (var line in run.Lines)
+            // A run whose stdout is read as lines is given what the script wrote to stdout, line by line.
+            var lines = run.Lines.Count > 0
+                ? run.Lines
+                : System.Text.Encoding.UTF8.GetString(run.Stdout).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
             {
                 try
                 {

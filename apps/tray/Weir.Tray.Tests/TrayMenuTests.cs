@@ -158,6 +158,8 @@ public sealed class TrayMenuTests
         Assert.True(Item(Menu(ServerPhase.Running), TrayMenuItem.Restart).Enabled);
         Assert.True(Item(Menu(ServerPhase.Stopped), TrayMenuItem.Restart).Enabled);
         Assert.False(Item(Menu(ServerPhase.Starting), TrayMenuItem.Restart).Enabled);
+        Assert.False(Item(Menu(ServerPhase.Stopping), TrayMenuItem.Restart).Enabled);
+        Assert.Equal("Weir - Stopping...", Item(Menu(ServerPhase.Stopping), TrayMenuItem.Status).Text);
     }
 
     [Fact]

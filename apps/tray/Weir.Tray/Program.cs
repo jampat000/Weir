@@ -185,7 +185,14 @@ static class Program
             // nothing is running that the install could interrupt (#857).
             var updateService = new UpdateService(TrayLog.Write);
             var updateSettings = UpdateSettings.Load(runtimeHome);
-            if (UpdateOnStart.TryApply(updateService, updateSettings.Mode, runtimeHome, StopOrphanedServers))
+            Func<RunningServer?> orphan = () => UpdateBackupReady.FindLiveServer(runtimeHome);
+            var backup = new UpdateBackupHook(
+                new UpdateBackupRequest(runtimeHome, TimeProvider.System, orphan).AskAsync,
+                runtimeHome,
+                () => orphan() is not null,
+                reason => TrayLog.Write($"Weir did not update because it could not save a copy of its data: {reason}"));
+            if (UpdateOnStart.TryApply(
+                updateService, updateSettings.Mode, runtimeHome, StopOrphanedServers, backup, () => orphan() is not null))
             {
                 return 0;
             }
@@ -313,7 +320,7 @@ static class Program
     }
 
     private static void StopOrphanedServers() =>
-        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: true, TrayLog.Write, "Startup (orphaned server check)");
+        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: true, TrayLog.Write, "Startup (orphaned server check)", ServerStopTimeouts.Orphan);
 
     /// <summary>The brand icon at its default size, for a window's title bar.</summary>
     internal static Icon LoadAppIcon() => LoadAppIcon(null);
@@ -356,7 +363,7 @@ static class Program
     // Velopack's install and uninstall hooks: stop this install's own tray and server so their
     // files can be replaced or removed. Only this install's — see InstallProcesses.
     private static void KillRunningProcesses(string why) =>
-        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: false, TrayLog.Write, why);
+        InstallProcesses.StopOwn(InstallProcesses.Root(), sameSessionOnly: false, TrayLog.Write, why, ServerStopTimeouts.Hook);
 
     // The Weir.exe these hooks run from: the install's own tray, which is what a mark must name to count for the install.
     private static string InstalledTray() => Environment.ProcessPath ?? Path.Combine(InstallProcesses.Root(), "Weir.exe");

@@ -1895,6 +1895,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/suite/check-update": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Suite Check Update
+     * @description Ask the tray to check for an update now.
+     */
+    post: operations["post_suite_check_update_api_v1_suite_check_update_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/suite/download-update": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Suite Download Update
+     * @description Ask the tray to download the available update now, whatever the update mode.
+     */
+    post: operations["post_suite_download_update_api_v1_suite_download_update_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/suite/configuration-backups": {
     parameters: {
       query?: never;
@@ -2590,6 +2630,22 @@ export interface components {
      * @description Body for POST /suite/apply-update.
      */
     ApplyUpdateIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /**
+     * CheckUpdateIn
+     * @description Body for POST /suite/check-update.
+     */
+    CheckUpdateIn: {
+      /** Csrf Token */
+      csrf_token: string;
+    };
+    /**
+     * DownloadUpdateIn
+     * @description Body for POST /suite/download-update.
+     */
+    DownloadUpdateIn: {
       /** Csrf Token */
       csrf_token: string;
     };
@@ -4565,6 +4621,11 @@ export interface components {
        * @description True while the media manager the workflow was set up from owns its watched and output folders, so a person changes them there, not in Weir.
        */
       folders_from_manager: boolean;
+      /**
+       * Minimum File Size Bytes
+       * @description The workflow's minimum file size in bytes, so a media manager can leave smaller files out of a hand-off instead of sending them for Weir to refuse. Null when the workflow has no minimum.
+       */
+      minimum_file_size_bytes?: number | null;
     };
     /** ReadinessResponse */
     ReadinessResponse: {
@@ -7890,6 +7951,9 @@ export interface components {
        */
       data_bytes: number;
       jobs_today: components["schemas"]["SystemOverviewJobsOut"];
+      /** @description The copy of Weir's data taken before the latest update changed it; null when no update has made one. */
+      last_update_backup:
+        components["schemas"]["SystemOverviewUpdateBackupOut"] | null;
       requests: components["schemas"]["SystemOverviewRequestsOut"];
       /**
        * Restarts This Week
@@ -7940,6 +8004,38 @@ export interface components {
        * @description The time within which nineteen answers in twenty came, over the last fifteen minutes, in milliseconds; zero when nothing was asked.
        */
       p95_ms: number;
+    };
+    /**
+     * SystemOverviewUpdateBackupOut
+     * @description A copy of Weir's data taken before an update changed it.
+     */
+    SystemOverviewUpdateBackupOut: {
+      /**
+       * From Version
+       * @description The version of Weir that was running when the copy was taken; null when the server that took it did not know (a copy taken as the new version started).
+       */
+      from_version: string | null;
+      /**
+       * In Data Folder
+       * @description Whether the copy is inside Weir's data folder (in Docker, the WEIR_HOME volume).
+       */
+      in_data_folder: boolean;
+      /**
+       * Path
+       * @description Where the copy of the database is, on the computer Weir runs on.
+       */
+      path: string;
+      /**
+       * Taken At
+       * Format: date-time
+       * @description When the copy was taken.
+       */
+      taken_at: string;
+      /**
+       * To Version
+       * @description The version of Weir the update was to.
+       */
+      to_version: string;
     };
     /**
      * SystemOverviewUpdateOut
@@ -8399,7 +8495,7 @@ export interface components {
     };
     /**
      * UpdateStateOut
-     * @description Current state of any downloaded-but-not-yet-applied update (read from update-state.json).
+     * @description Where the tray is with an update: idle (an update it found and did not download is named in pending_version), checking, downloading, downloaded (waiting to be applied) or failed (failure says why). Read from update-state.json. tray_running says whether a tray is there to take a request: false on a Docker or source install and when the tray has not said it is alive lately.
      */
     UpdateStateOut: {
       /**
@@ -8407,8 +8503,26 @@ export interface components {
        * @default false
        */
       downloaded: boolean;
+      /** Failure */
+      failure?: string | null;
+      /**
+       * Not Updated Reason
+       * @description Present only while the tray holds the downloaded update back because it could not save a copy of Weir's data first: why, in plain words, and what to do.
+       */
+      not_updated_reason?: string;
       /** Pending Version */
       pending_version?: string | null;
+      /**
+       * State
+       * @default idle
+       * @enum {string}
+       */
+      state: "idle" | "checking" | "downloading" | "downloaded" | "failed";
+      /**
+       * Tray Running
+       * @default false
+       */
+      tray_running: boolean;
     };
     /** UserPublic */
     UserPublic: {
@@ -12116,6 +12230,72 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["ApplyUpdateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UpdateStateOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_suite_check_update_api_v1_suite_check_update_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckUpdateIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UpdateStateOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_suite_download_update_api_v1_suite_download_update_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DownloadUpdateIn"];
       };
     };
     responses: {
