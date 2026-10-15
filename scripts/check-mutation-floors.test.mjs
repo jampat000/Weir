@@ -77,6 +77,22 @@ test("the shipped floors file is usable and names the targets the workflow runs"
   }
 });
 
+test("the parts of SafeSwap.cs that are mutated as separate targets leave no character out", () => {
+  const spans = ["preflight", "prepare", "commit"].flatMap((part) => {
+    const config = JSON.parse(readFileSync(path.join(root, "apps", "server", "mutation", `file-lifecycle-swap-${part}`, "stryker-config.json"), "utf8"));
+    return config["stryker-config"].mutate.flatMap((pattern) => {
+      const match = pattern.match(/SafeSwap\.cs\{(\d+)\.\.(\d+)\}$/);
+      return match ? [[Number(match[1]), Number(match[2])]] : [];
+    });
+  });
+  const length = readFileSync(path.join(root, "apps", "server", "src", "Weir.Infrastructure", "LibraryMode", "SafeSwap.cs"), "utf8").length;
+  assert.equal(spans.length, 3);
+  assert.equal(spans[0][0], 0);
+  assert.equal(spans[1][0], spans[0][1] + 1, "the second part starts where the first ends");
+  assert.equal(spans[2][0], spans[1][1] + 1, "the third part starts where the second ends");
+  assert.ok(spans[2][1] >= length, "the last part runs to the end of the file");
+});
+
 test("a score at its floor passes and one below it fails, naming the target and the figures", () => {
   const floors = floorsFile({ floors: { alpha: 91.7 } });
   assert.deepEqual(evaluate(floors, { alpha: { counts: counts(917, 83) }, beta: { counts: counts(5, 5) } }).problems, []);
