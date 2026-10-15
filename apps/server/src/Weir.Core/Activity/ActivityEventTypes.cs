@@ -50,6 +50,9 @@ public static class ActivityEventTypes
     /// <summary>A report sent to the media manager that handed a file over.</summary>
     public const string ProcessingHandoffReported = "processing.handoff_reported";
 
+    /// <summary>A person told Weir to give up on reports it still owed a media manager, so the connection could be removed.</summary>
+    public const string ProcessingHandoffReportsDropped = "processing.handoff_reports_dropped";
+
     /// <summary>The manager cancelled a hand-off Weir had not started (#480).</summary>
     public const string ProcessingHandoffCancelled = "processing.handoff_cancelled";
 
@@ -98,4 +101,10 @@ public static class LibraryActivityEventTypes
     /// <summary>#735: a crash left a kept original that does not match its backup's contents. Recorded once per swap by
     /// <c>SwapRecoverySweep</c>, which then stops retrying it (<c>SwapJournalState.KeepConflict</c>).</summary>
     public const string OriginalKeepConflict = "library.original_keep_conflict";
+
+    /// <summary>
+    /// A person used "Download again" (#509), which asks a Sonarr or Radarr to delete a file and search for a new copy. Recorded for
+    /// every answer, with who asked, which manager, whether the file was deleted and whether a search was sent.
+    /// </summary>
+    public const string RedownloadRequested = "library.redownload_requested";
 }

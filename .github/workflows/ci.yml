@@ -93,9 +93,10 @@ jobs:
               - 'apps/server/Directory.Build.props'
             # Only files the package smokes actually exercise: the packaged artefacts (Dockerfile, docker/**,
             # compose.yaml, .dockerignore, packaging/**, the tray), the host entry point that ships inside them
-            # (apps/server/src/Weir.Host/**, not the whole server), the smoke scripts themselves, and the
-            # workflow that runs them. A server or web change that is not in this list still reaches the
-            # packaging smokes on the next push to main (see main_push below), just not on every pull request.
+            # (apps/server/src/Weir.Host/**, not the whole server), the database migrations the upgrade smoke carries an
+            # old volume across, the smoke scripts themselves, and the workflow that runs them. A server or web change
+            # that is not in this list still reaches the packaging smokes on the next push to main (see main_push
+            # below), just not on every pull request.
             packaging:
               - 'Dockerfile'
               - 'docker/**'
@@ -107,9 +108,15 @@ jobs:
               - 'apps/server/tools/Weir.LiveAudit/**'
               - 'scripts/smoke-windows-package.ps1'
               - 'scripts/wait-for-health.mjs'
+              - 'scripts/docker-compose-smoke.mjs'
+              - 'scripts/docker-smoke/**'
+              - 'scripts/find-previous-release.mjs'
+              - 'scripts/semver.mjs'
               - 'scripts/ffmpeg-cache-key.mjs'
               - 'scripts/ffmpeg-pin.mjs'
               - 'scripts/install-ffmpeg-linux.mjs'
+              - 'apps/server/src/Weir.Infrastructure/Migrations/**'
+              - 'apps/server/src/Weir.Infrastructure/Sqlite/**'
               - '.github/workflows/ci-packaging.yml'
             # The real ffmpeg, ffprobe and mkvmerge the server tests run against (their pins and installers) and the check
             # that every real-tool test ran. The workflows filter below covers the actions that call them.
@@ -267,19 +274,31 @@ jobs:
       - name: The real media tools - pins, installers and the check that every real-tool test ran
         run: node --test scripts/ffmpeg-pin.test.mjs scripts/pinned-download.test.mjs scripts/mkvtoolnix-pin.test.mjs scripts/install-mkvtoolnix-linux.test.mjs scripts/summarize-test-results.test.mjs scripts/check-real-tool-tests.test.mjs
 
-      # The register is read against the code, and against the open coverage issues and the branch a pull request goes into.
+      # The register is read against the code, against the open coverage issues, and against the register as it was before this change:
+      # on a pull request the base commit's, on a push to main the previous commit's. The gaps may not go up from that count
+      # (scripts/check-coverage-register.mjs), so no gap count is kept in the file for pull requests to conflict on.
       - name: Coverage register accounts for everything and has no more gaps
         env:
           GH_TOKEN: ${{ github.token }}
-          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           node --test scripts/check-coverage-register.test.mjs
-          if [ -n "$BASE_REF" ]; then
-            git fetch --depth=1 origin "$BASE_REF"
-            node scripts/check-coverage-register.mjs --gh --base "origin/$BASE_REF"
+          args=(--gh --report)
+          if [ -n "$BEFORE" ] && git fetch --no-tags --depth=1 origin "$BEFORE"; then
+            args+=(--base FETCH_HEAD)
           else
-            node scripts/check-coverage-register.mjs --gh
+            echo "No earlier commit to compare the register with."
           fi
+          node scripts/check-coverage-register.mjs "${args[@]}"
+
+      - name: Upload the coverage register statistics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-register
+          if-no-files-found: ignore
+          retention-days: 7
+          path: artifacts/coverage-register.md
 
       - name: Docker entrypoint keeps the server's umask
         run: node --test scripts/docker-entrypoint.test.mjs
@@ -372,12 +391,33 @@ jobs:
   server-windows:
     needs: changes
     if: needs.changes.outputs.run_server_windows == 'true'
-    runs-on: windows-latest
+    # The spare Windows PC (docs/self-hosted-runner.md) when the repository variable WEIR_SELF_HOSTED_WINDOWS is 'true',
+    # never for a pull request from a fork; GitHub's own Windows runner otherwise.
+    runs-on: ${{ vars.WEIR_SELF_HOSTED_WINDOWS == 'true' && !github.event.pull_request.head.repo.fork && fromJSON('["self-hosted","Windows","weir-heavy"]') || 'windows-latest' }}
     timeout-minutes: 30
+    env:
+      # A self-hosted Windows PC keeps Windows' default script policy; this lets the job's own PowerShell run
+      # its scripts without changing the machine's setting. GitHub's runners already allow it.
+      PSExecutionPolicyPreference: Bypass
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # On a self-hosted PC: `bash` resolves to Windows' own bash.exe (WSL) unless Git's comes first on PATH, and
+      # the service account's temporary folder is under C:\Windows, where Weir rightly refuses to watch a folder.
+      - name: Self-hosted PC set-up
+        if: runner.environment == 'self-hosted'
+        shell: powershell
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:ProgramFiles\Git\bin"
+          $temp = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force -Path $temp | Out-Null
+          Add-Content -Path $env:GITHUB_ENV -Value "TEMP=$temp"
+          Add-Content -Path $env:GITHUB_ENV -Value "TMP=$temp"
+
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        # A self-hosted runner's service account cannot write to Program Files; the tool cache is its own.
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
           global-json-file: apps/server/global.json
           cache: true
@@ -614,12 +654,33 @@ jobs:
   tray:
     needs: changes
     if: needs.changes.outputs.run_tray == 'true'
-    runs-on: windows-latest
+    # The spare Windows PC (docs/self-hosted-runner.md) when the repository variable WEIR_SELF_HOSTED_WINDOWS is 'true',
+    # never for a pull request from a fork; GitHub's own Windows runner otherwise.
+    runs-on: ${{ vars.WEIR_SELF_HOSTED_WINDOWS == 'true' && !github.event.pull_request.head.repo.fork && fromJSON('["self-hosted","Windows","weir-heavy"]') || 'windows-latest' }}
     timeout-minutes: 10
+    env:
+      # A self-hosted Windows PC keeps Windows' default script policy; this lets the job's own PowerShell run
+      # its scripts without changing the machine's setting. GitHub's runners already allow it.
+      PSExecutionPolicyPreference: Bypass
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # On a self-hosted PC: `bash` resolves to Windows' own bash.exe (WSL) unless Git's comes first on PATH, and
+      # the service account's temporary folder is under C:\Windows, where Weir rightly refuses to watch a folder.
+      - name: Self-hosted PC set-up
+        if: runner.environment == 'self-hosted'
+        shell: powershell
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:ProgramFiles\Git\bin"
+          $temp = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force -Path $temp | Out-Null
+          Add-Content -Path $env:GITHUB_ENV -Value "TEMP=$temp"
+          Add-Content -Path $env:GITHUB_ENV -Value "TMP=$temp"
+
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        # A self-hosted runner's service account cannot write to Program Files; the tool cache is its own.
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
           global-json-file: apps/server/global.json
           cache: true
@@ -677,11 +738,28 @@ jobs:
         with:
           global-json-file: apps/server/global.json
 
-      - name: Download the coverage of every leg that ran
+      # One download per leg, each into its own folder. A pattern that matches a single artifact is unpacked
+      # straight into `path` rather than a folder named after it, so a run where only one leg ran would lose it.
+      - name: Download the server coverage
+        if: needs.changes.outputs.run_server_linux == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          pattern: coverage-*
+          pattern: coverage-server-*
           path: coverage-input
+
+      - name: Download the tray coverage
+        if: needs.changes.outputs.run_tray == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: coverage-tray
+          path: coverage-input/coverage-tray
+
+      - name: Download the web coverage
+        if: needs.changes.outputs.run_web == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: coverage-web
+          path: coverage-input/coverage-web
 
       - name: Install ReportGenerator
         run: dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.5.11

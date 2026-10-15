@@ -34,6 +34,8 @@ export const EVENT_LABELS: Record<string, string> = {
   "processing.file_reject_fell_back": "File handed back instead of rejected",
   "processing.handoff_reported": "Result reported to your media manager",
   "processing.handoff_cancelled": "Hand-off cancelled by your media manager",
+  "processing.handoff_reports_dropped":
+    "Reports to your media manager given up",
   "processing.file_manual_plan_queued": "Hand-picked tracks queued",
   "processing.file_left_watched_folder": "File left the watched folder",
   "processing.handback_outcome": "What happened to a cleaned copy",
@@ -49,6 +51,7 @@ export const EVENT_LABELS: Record<string, string> = {
   "library.file_skipped": "Library file skipped",
   "library.file_failed": "Library file could not be cleaned",
   "library.original_keep_conflict": "Kept original does not match its backup",
+  "library.redownload_requested": "Download again asked of your media manager",
   "library.file_change_notified": "Media manager told about a changed file",
   "library.file_change_notify_skipped": "Media manager notice skipped",
   "library.file_change_notify_warning":
