@@ -29,6 +29,7 @@ env:
   DOTNET_NOLOGO: "1"
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
+# TEMPORARY (#977): the matrix is cut to the targets still being measured; restored before the merge.
 jobs:
   mutate:
     name: Mutate ${{ matrix.target }}
@@ -41,14 +42,6 @@ jobs:
           - { target: file-lifecycle-swap-preflight, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-preflight/stryker-config.json, restore: apps/server, solution: Weir.slnx }
           - { target: file-lifecycle-swap-prepare, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-prepare/stryker-config.json, restore: apps/server, solution: Weir.slnx }
           - { target: file-lifecycle-swap-commit, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-commit/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: file-lifecycle-recovery, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-recovery/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: file-lifecycle-moves, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-moves/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: handoff-intake, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/handoff-intake/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: outcome-handling, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/outcome-handling/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: write-gate-database, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/write-gate-database/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: write-gate-unit-of-work, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/write-gate-unit-of-work/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: core-rules, kind: dotnet, directory: apps/server/tests/Weir.Core.Tests, config: ../../mutation/core-rules/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: start-supervision, kind: dotnet, directory: apps/tray/Weir.Tray.Tests, config: ../mutation/start-supervision/stryker-config.json, restore: apps/tray, solution: Weir.Tray.slnx }
           - { target: web-api-client, kind: web }
           - { target: web-processing-files, kind: web }
           - { target: web-processing-libraries, kind: web }
