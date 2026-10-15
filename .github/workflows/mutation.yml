@@ -29,7 +29,7 @@ env:
   DOTNET_NOLOGO: "1"
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
-# TEMPORARY (#977): the matrix is cut to the SafeSwap targets, measured a second time; restored before the merge.
+# TEMPORARY (#977): the matrix is cut to the targets that have been measured once; restored before the merge.
 jobs:
   mutate:
     name: Mutate ${{ matrix.target }}
@@ -39,9 +39,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: file-lifecycle-swap-preflight, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-preflight/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: file-lifecycle-swap-prepare, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-prepare/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: file-lifecycle-swap-commit, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-commit/stryker-config.json, restore: apps/server, solution: Weir.slnx }
+          - { target: file-lifecycle-recovery, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-recovery/stryker-config.json, restore: apps/server, solution: Weir.slnx }
+          - { target: file-lifecycle-moves, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-moves/stryker-config.json, restore: apps/server, solution: Weir.slnx }
+          - { target: write-gate-database, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/write-gate-database/stryker-config.json, restore: apps/server, solution: Weir.slnx }
+          - { target: write-gate-unit-of-work, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/write-gate-unit-of-work/stryker-config.json, restore: apps/server, solution: Weir.slnx }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
