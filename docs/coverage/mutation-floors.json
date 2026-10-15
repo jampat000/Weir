@@ -3,7 +3,6 @@
     "commit": "pending the first measuring runs",
     "note": "Placeholders until the Mutation workflow has run on this branch: every floor is 0 and every run id is 1.",
     "runs": {
-      "file-lifecycle-swap": 1,
       "file-lifecycle-recovery": 1,
       "file-lifecycle-moves": 1,
       "handoff-intake": 1,
@@ -17,13 +16,13 @@
       "web-processing-libraries": 1,
       "web-settings-requests": 1,
       "web-dialogs-library": 1,
-      "web-dialogs-activity-profile": 1
+      "web-dialogs-activity-profile": 1,
+      "file-lifecycle-swap-preflight": 1,
+      "file-lifecycle-swap-prepare": 1,
+      "file-lifecycle-swap-commit": 1
     }
   },
   "floors": {
-    "file-lifecycle-swap": {
-      "score": 0
-    },
     "file-lifecycle-recovery": {
       "score": 0
     },
@@ -64,6 +63,15 @@
       "score": 0
     },
     "web-dialogs-activity-profile": {
+      "score": 0
+    },
+    "file-lifecycle-swap-preflight": {
+      "score": 0
+    },
+    "file-lifecycle-swap-prepare": {
+      "score": 0
+    },
+    "file-lifecycle-swap-commit": {
       "score": 0
     }
   }

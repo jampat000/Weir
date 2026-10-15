@@ -38,7 +38,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: file-lifecycle-swap, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap/stryker-config.json, restore: apps/server, solution: Weir.slnx }
+          - { target: file-lifecycle-swap-preflight, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-preflight/stryker-config.json, restore: apps/server, solution: Weir.slnx }
+          - { target: file-lifecycle-swap-prepare, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-prepare/stryker-config.json, restore: apps/server, solution: Weir.slnx }
+          - { target: file-lifecycle-swap-commit, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-commit/stryker-config.json, restore: apps/server, solution: Weir.slnx }
           - { target: file-lifecycle-recovery, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-recovery/stryker-config.json, restore: apps/server, solution: Weir.slnx }
           - { target: file-lifecycle-moves, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-moves/stryker-config.json, restore: apps/server, solution: Weir.slnx }
           - { target: handoff-intake, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/handoff-intake/stryker-config.json, restore: apps/server, solution: Weir.slnx }

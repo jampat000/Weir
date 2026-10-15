@@ -16,7 +16,9 @@ files it names and the tests that cover them.
 
 | Target | Tool | Files | Tests |
 | --- | --- | --- | --- |
-| `file-lifecycle-swap` | Stryker.NET | `SafeSwap` | `Weir.Infrastructure.Tests` |
+| `file-lifecycle-swap-preflight` | Stryker.NET | `SafeSwap` up to and including `Preflight`, and its support file | `Weir.Infrastructure.Tests` |
+| `file-lifecycle-swap-prepare` | Stryker.NET | `SafeSwap.RunAsync` from its start to the permissions copy | `Weir.Infrastructure.Tests` |
+| `file-lifecycle-swap-commit` | Stryker.NET | `SafeSwap.RunAsync` from recording the commit to its end | `Weir.Infrastructure.Tests` |
 | `file-lifecycle-recovery` | Stryker.NET | `SwapJournal`, `SwapRecoverySweep` | `Weir.Infrastructure.Tests` |
 | `file-lifecycle-moves` | Stryker.NET | `OriginalsMover`, `FinalPaths`, `ReleaseFolderRemoval` | `Weir.Infrastructure.Tests` |
 | `handoff-intake` | Stryker.NET | `HandoffLedgerStore*`, `MediaManagerIntake*` | `Weir.Infrastructure.Tests` |
@@ -33,6 +35,8 @@ files it names and the tests that cover them.
 | `web-dialogs-activity-profile` | StrykerJS | the Activity remove dialog and the profile remove dialog (`profiles-tab.tsx`) | the tests that import them (`vitest related`) |
 
 A target is one job, and a job has to finish inside its time limit, so the bigger areas are split into several targets.
+
+A part of a file is a line span in the target's `mutate` list (`SafeSwap.cs{1..142}`); when `SafeSwap.cs` changes length the spans move with it.
 
 The config of each target is `stryker-config.json` (Stryker.NET) or `stryker.config.json` (StrykerJS) in the `mutation`
 folder of `apps/server`, `apps/tray` or `apps/web`. The mutated files are its `mutate` list; a new file in an area is

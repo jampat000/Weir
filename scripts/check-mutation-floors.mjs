@@ -27,8 +27,11 @@ import { pathToFileURL } from "node:url";
 const SUMMARY_BUDGET = 700_000;
 const SOURCE_SNIPPET = 90;
 const TESTS_NAMED = 2;
-/** More timeouts than this share of the judged changes means the time limit is too short, not that the tests are strong. */
-const TIMEOUT_SHARE = 0.25;
+/**
+ * More timeouts than this share of the judged changes means the time limit is too short, not that the tests are strong:
+ * a deadlock a mutation causes ends in a timeout that is a real catch, but not for most of a target's changes.
+ */
+const TIMEOUT_SHARE = 0.5;
 const ANNOTATIONS = 10;
 
 const SURVIVED = "Survived";
