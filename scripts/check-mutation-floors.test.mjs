@@ -249,6 +249,15 @@ test("a report with nothing to judge fails rather than scoring 100", () => {
   });
 });
 
+test("a report where most changes timed out fails rather than scoring them all as caught", () => {
+  withReports((folder) => {
+    mkdirSync(path.join(folder, "mutation-alpha"), { recursive: true });
+    const mutants = Array.from({ length: 8 }, (_, id) => ({ id: String(id), mutatorName: "Statement", status: "Timeout", location: { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } } }));
+    writeFileSync(path.join(folder, "mutation-alpha", "mutation-report.json"), JSON.stringify({ schemaVersion: "1.0", files: { "src/a.ts": { language: "typescript", source: "x", mutants } } }));
+    assert.match(loadTarget("alpha", folder).result.missing, /8 of 8 changes ended by timing out/);
+  });
+});
+
 test("the floors can be checked against the base branch's without any report", () => {
   withReports((folder) => {
     const floorsPath = path.join(folder, "floors.json");

@@ -27,6 +27,8 @@ import { pathToFileURL } from "node:url";
 const SUMMARY_BUDGET = 700_000;
 const SOURCE_SNIPPET = 90;
 const TESTS_NAMED = 2;
+/** More timeouts than this share of the judged changes means the time limit is too short, not that the tests are strong. */
+const TIMEOUT_SHARE = 0.25;
 const ANNOTATIONS = 10;
 
 const SURVIVED = "Survived";
@@ -293,6 +295,12 @@ export function loadTarget(target, folder) {
   const report = readJson(file);
   const counts = countMutants(report);
   if (counts.judged === 0) return { result: { missing: `${file} holds no mutants that could be judged; the run mutated nothing.` }, survivors: [] };
+  if (counts.timeout > counts.judged * TIMEOUT_SHARE) {
+    return {
+      result: { missing: `${counts.timeout} of ${counts.judged} changes ended by timing out, which scores them as caught. Raise the target's time limit (Stryker's timeoutFactor or timeoutMS) before trusting the score.` },
+      survivors: [],
+    };
+  }
   return { result: { counts }, survivors: survivorsOf(report) };
 }
 

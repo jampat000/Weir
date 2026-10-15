@@ -1,0 +1,17 @@
+{
+  "stryker-config": {
+    "project": "Weir.Infrastructure.csproj",
+    "mutate": [
+      "**/LibraryMode/SafeSwap.cs",
+      "**/LibraryMode/SafeSwap.Support.cs"
+    ],
+    "test-case-filter": "Category!=Stress&Category!=Contract&Category!=E2E",
+    "coverage-analysis": "perTest",
+    "reporters": [
+      "json",
+      "html",
+      "dots"
+    ],
+    "concurrency": 4
+  }
+}

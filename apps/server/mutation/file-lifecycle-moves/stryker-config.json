@@ -2,13 +2,17 @@
   "stryker-config": {
     "project": "Weir.Infrastructure.csproj",
     "mutate": [
-      "**/Sqlite/SqliteDatabase.cs",
-      "**/Sqlite/UnitOfWork.cs",
-      "**/Sqlite/WriteLockTurns.cs"
+      "**/LibraryMode/OriginalsMover.cs",
+      "**/MediaManagers/FinalPaths.cs",
+      "**/Processing/ReleaseFolderRemoval.cs"
     ],
     "test-case-filter": "Category!=Stress&Category!=Contract&Category!=E2E",
     "coverage-analysis": "perTest",
-    "reporters": ["json", "html", "dots"],
+    "reporters": [
+      "json",
+      "html",
+      "dots"
+    ],
     "concurrency": 4
   }
 }

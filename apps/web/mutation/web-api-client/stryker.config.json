@@ -2,21 +2,20 @@
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-core.json",
   "testRunner": "command",
   "commandRunner": {
-    "command": "npx vitest run src/lib"
+    "command": "npx vitest run src/lib/api src/lib/auth"
   },
   "mutate": [
     "src/lib/api/client.ts",
     "src/lib/api/send-json.ts",
     "src/lib/api/auth-api.ts",
     "src/lib/api/activity-api.ts",
-    "src/lib/auth/queries.ts",
-    "src/lib/processing/*-api.ts",
-    "src/lib/processing/jobs-inspection/api.ts",
-    "src/lib/settings/settings-api.ts"
+    "src/lib/auth/queries.ts"
   ],
   "coverageAnalysis": "off",
   "tempDirName": "../../.stryker-tmp",
-  "concurrency": 3,
+  "concurrency": 2,
+  "timeoutFactor": 3,
+  "timeoutMS": 60000,
   "dryRunTimeoutMinutes": 30,
   "reporters": [
     "clear-text",

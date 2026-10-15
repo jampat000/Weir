@@ -16,14 +16,23 @@ files it names and the tests that cover them.
 
 | Target | Tool | Files | Tests |
 | --- | --- | --- | --- |
-| `file-lifecycle` | Stryker.NET | `SafeSwap`, `SwapJournal`, `SwapRecoverySweep`, `OriginalsMover`, `FinalPaths`, `ReleaseFolderRemoval` | `Weir.Infrastructure.Tests` |
+| `file-lifecycle-swap` | Stryker.NET | `SafeSwap` | `Weir.Infrastructure.Tests` |
+| `file-lifecycle-recovery` | Stryker.NET | `SwapJournal`, `SwapRecoverySweep` | `Weir.Infrastructure.Tests` |
+| `file-lifecycle-moves` | Stryker.NET | `OriginalsMover`, `FinalPaths`, `ReleaseFolderRemoval` | `Weir.Infrastructure.Tests` |
 | `handoff-intake` | Stryker.NET | `HandoffLedgerStore*`, `MediaManagerIntake*` | `Weir.Infrastructure.Tests` |
 | `outcome-handling` | Stryker.NET | `HandbackOutcomes`, `HandoffCompletionReporter*` | `Weir.Infrastructure.Tests` |
-| `write-gate` | Stryker.NET | `SqliteDatabase`, `UnitOfWork`, `WriteLockTurns` | `Weir.Infrastructure.Tests` |
+| `write-gate-database` | Stryker.NET | `SqliteDatabase`, `WriteLockTurns` | `Weir.Infrastructure.Tests` |
+| `write-gate-unit-of-work` | Stryker.NET | `UnitOfWork` | `Weir.Infrastructure.Tests` |
 | `core-rules` | Stryker.NET | `SafeSwapRules`, `LibraryFolderPublishing`, `HandoffLedgerRules`, `HandoffPaths`, `HandoffSourceFiles`, `HandbackRules`, `CompletionReports` | `Weir.Core.Tests` and `Weir.Infrastructure.Tests` |
 | `start-supervision` | Stryker.NET | `ServerHost*`, `StartWatch`, `StartProgress*` (the tray) | `Weir.Tray.Tests` |
-| `web-api-client` | StrykerJS | `lib/api/client.ts` and the request builders under `lib/api`, `lib/processing`, `lib/settings` and `lib/auth` | the vitest tests under `src/lib` |
-| `web-destructive-dialogs` | StrykerJS | `confirm-dialog.tsx` and the Activity remove, Library clean, workflow remove and profile remove dialogs | the vitest tests that import them (`vitest related`) |
+| `web-api-client` | StrykerJS | `lib/api/client.ts`, `send-json.ts`, `auth-api.ts`, `activity-api.ts` and `lib/auth/queries.ts` | the tests under `src/lib/api` and `src/lib/auth` |
+| `web-processing-files` | StrykerJS | the file, kept-file, rejected-file, remux, direct-play, maintenance, settings, stats, preview and scan request builders in `lib/processing` | the tests under `src/lib/processing` |
+| `web-processing-libraries` | StrykerJS | the library, clean, folder-chain, manager, mode, redownload, setup and rule-set request builders in `lib/processing`, and `jobs-inspection/api.ts` | the tests under `src/lib/processing` |
+| `web-settings-requests` | StrykerJS | `lib/settings/settings-api.ts` | the tests under `src/lib/settings` |
+| `web-dialogs-library` | StrykerJS | `confirm-dialog.tsx`, the Library clean dialog and the workflow remove dialog | the tests that import them (`vitest related`) |
+| `web-dialogs-activity-profile` | StrykerJS | the Activity remove dialog and the profile remove dialog (`profiles-tab.tsx`) | the tests that import them (`vitest related`) |
+
+A target is one job, and a job has to finish inside its time limit, so the bigger areas are split into several targets.
 
 The config of each target is `stryker-config.json` (Stryker.NET) or `stryker.config.json` (StrykerJS) in the `mutation`
 folder of `apps/server`, `apps/tray` or `apps/web`. The mutated files are its `mutate` list; a new file in an area is
@@ -33,7 +42,8 @@ Stryker.NET runs the tests that cover each changed line (its per-test coverage).
 command once for each change, with `coverageAnalysis` off. Its Vitest runner is not used: version 10.0.0 selects the tests
 to run by their names joined with a space, and Vitest 5 joins a test's name to its `describe` blocks with ` > `, so for any
 test inside a `describe` it selects nothing and every change looks like a survivor. The command runner needs no test
-names. For that reason the web survivors list "the related tests ran" in place of the tests that ran the line, and a line
+names, and a time limit generous enough that a slow run is not counted as a catch (the check refuses a report where most
+changes ended by timing out). For that reason the web survivors list "the related tests ran" in place of the tests that ran the line, and a line
 no test runs shows as a survivor, not as "none run this line".
 
 Stryker.NET's `Standard` mutation level is used, and the tests that need ffmpeg or mkvmerge skip themselves, as they do
