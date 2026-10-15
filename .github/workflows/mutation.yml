@@ -29,7 +29,7 @@ env:
   DOTNET_NOLOGO: "1"
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
-# TEMPORARY (#977): the matrix is cut to the targets still being measured; restored before the merge.
+# TEMPORARY (#977): the matrix is cut to the targets still being measured (second sample); restored before the merge.
 jobs:
   mutate:
     name: Mutate ${{ matrix.target }}
