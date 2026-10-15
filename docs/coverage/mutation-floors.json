@@ -1,0 +1,26 @@
+{
+  "measuredFrom": {
+    "commit": "pending the first measuring runs",
+    "note": "Placeholders until the Mutation workflow has run on this branch: every floor is 0 and every run id is 1.",
+    "runs": {
+      "file-lifecycle": 1,
+      "handoff-intake": 1,
+      "outcome-handling": 1,
+      "write-gate": 1,
+      "core-rules": 1,
+      "start-supervision": 1,
+      "web-api-client": 1,
+      "web-destructive-dialogs": 1
+    }
+  },
+  "floors": {
+    "file-lifecycle": { "score": 0 },
+    "handoff-intake": { "score": 0 },
+    "outcome-handling": { "score": 0 },
+    "write-gate": { "score": 0 },
+    "core-rules": { "score": 0 },
+    "start-supervision": { "score": 0 },
+    "web-api-client": { "score": 0 },
+    "web-destructive-dialogs": { "score": 0 }
+  }
+}

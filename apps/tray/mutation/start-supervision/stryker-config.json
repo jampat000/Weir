@@ -1,0 +1,15 @@
+{
+  "stryker-config": {
+    "project": "Weir.Tray.csproj",
+    "mutate": [
+      "**/ServerHost.cs",
+      "**/ServerHost.Supervision.cs",
+      "**/StartWatch.cs",
+      "**/StartProgress.cs",
+      "**/StartProgressFeed.cs"
+    ],
+    "coverage-analysis": "perTest",
+    "reporters": ["json", "html", "dots"],
+    "concurrency": 4
+  }
+}

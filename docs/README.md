@@ -27,6 +27,7 @@ whose source is in [`../docs-site/docs`](../docs-site/docs).
 - [`exec-plans/README.md`](exec-plans/README.md) - where execution plans live.
 - [`release.md`](release.md) - the release procedure and what each release produces.
 - [`coverage/README.md`](coverage/README.md) - how test coverage is measured on every CI run, the floors that only go up, and how to raise or lower one.
+- [`coverage/mutation.md`](coverage/mutation.md) - mutation testing of the risky core: what is mutated, how to read the survivors, and the score floors that only go up.
 - [`start-supervision.md`](start-supervision.md) - how the tray supervises every start of the server: progress, hung starts, retries, the start limit, what it logs and shows, and the measurements behind the numbers.
 - [`release-governance.md`](release-governance.md) - repository controls and the checks before and after a release.
 - [`ci-standard.md`](ci-standard.md) - the CI and release standard Weir shares, as an identical separate copy, with Deluno.

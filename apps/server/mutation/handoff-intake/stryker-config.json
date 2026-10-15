@@ -1,0 +1,13 @@
+{
+  "stryker-config": {
+    "project": "Weir.Infrastructure.csproj",
+    "mutate": [
+      "**/MediaManagers/HandoffLedgerStore*.cs",
+      "**/MediaManagers/MediaManagerIntake*.cs"
+    ],
+    "test-case-filter": "Category!=Stress&Category!=Contract&Category!=E2E",
+    "coverage-analysis": "perTest",
+    "reporters": ["json", "html", "dots"],
+    "concurrency": 4
+  }
+}
