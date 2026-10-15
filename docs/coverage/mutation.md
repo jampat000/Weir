@@ -36,7 +36,7 @@ files it names and the tests that cover them.
 
 A target is one job, and a job has to finish inside its time limit, so the bigger areas are split into several targets.
 
-A part of a file is a line span in the target's `mutate` list (`SafeSwap.cs{1..142}`); when `SafeSwap.cs` changes length the spans move with it.
+A part of a file is a span of characters in the target's `mutate` list (`SafeSwap.cs{0..6789}`: Stryker.NET counts characters, not lines). When `SafeSwap.cs` changes, move the spans to the same places in the new text, so that the three together still cover the whole file.
 
 The config of each target is `stryker-config.json` (Stryker.NET) or `stryker.config.json` (StrykerJS) in the `mutation`
 folder of `apps/server`, `apps/tray` or `apps/web`. The mutated files are its `mutate` list; a new file in an area is

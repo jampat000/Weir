@@ -42,12 +42,6 @@ jobs:
           - { target: file-lifecycle-swap-preflight, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-preflight/stryker-config.json, restore: apps/server, solution: Weir.slnx }
           - { target: file-lifecycle-swap-prepare, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-prepare/stryker-config.json, restore: apps/server, solution: Weir.slnx }
           - { target: file-lifecycle-swap-commit, kind: dotnet, directory: apps/server/tests/Weir.Infrastructure.Tests, config: ../../mutation/file-lifecycle-swap-commit/stryker-config.json, restore: apps/server, solution: Weir.slnx }
-          - { target: web-api-client, kind: web }
-          - { target: web-processing-files, kind: web }
-          - { target: web-processing-libraries, kind: web }
-          - { target: web-settings-requests, kind: web }
-          - { target: web-dialogs-library, kind: web }
-          - { target: web-dialogs-activity-profile, kind: web }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 

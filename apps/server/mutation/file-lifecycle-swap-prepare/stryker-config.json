@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "Weir.Infrastructure.csproj",
     "mutate": [
-      "**/LibraryMode/SafeSwap.cs{143..243}"
+      "**/LibraryMode/SafeSwap.cs{6790..11835}"
     ],
     "test-case-filter": "Category!=Stress&Category!=Contract&Category!=E2E",
     "coverage-analysis": "perTest",
